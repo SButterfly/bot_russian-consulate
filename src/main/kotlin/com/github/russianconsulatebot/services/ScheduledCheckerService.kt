@@ -13,7 +13,8 @@ class ScheduledCheckerService(
     private val passport10Service: Passport10Service,
     private val telegramBot: TelegramBot,
     @Value("\${scheduler.charIds:}")
-    private val chatIds: List<Long>
+    private val chatIds: List<Long>,
+    private val lastChecks: LastChecks,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
@@ -21,14 +22,21 @@ class ScheduledCheckerService(
     suspend fun findAvailableWindows() {
         log.info("Started finding available slots")
 
-        val availableSlots = passport10Service.containsAvailableSlots()
+        try {
+            val availableSlots = passport10Service.containsAvailableSlots()
+            log.info("Found available slots for notary: {}", availableSlots)
 
-        log.info("Found available slots for notary: {}", availableSlots)
-
-        if (availableSlots) {
-            for (chatId in chatIds) {
-                telegramBot.sendMessage(chatId, "Found available passport for 10 years slots on https://hague.kdmid.ru/ !!!")
+            if (availableSlots) {
+                for (chatId in chatIds) {
+                    telegramBot.sendMessage(chatId, "Found available passport for 10 years slots on https://hague.kdmid.ru/ !!!")
+                }
             }
+
+            lastChecks.push("Found slot: $availableSlots")
+        } catch (e: Exception) {
+            log.error("Got an error", e)
+            lastChecks.push(e.toString())
+            throw e
         }
     }
 }

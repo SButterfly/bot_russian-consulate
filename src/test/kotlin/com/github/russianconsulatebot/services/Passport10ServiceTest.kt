@@ -8,7 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest
 import kotlin.time.Duration
 
 @SpringBootTest
-@Disabled("Disabled as it does a heavy work")
+//@Disabled("Disabled as it does a heavy work")
 class Passport10ServiceTest {
 
     @Autowired
