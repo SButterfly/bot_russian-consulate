@@ -18,11 +18,21 @@ class AntiCaptureServiceIntegrationTest {
 
     @Test
     fun `parse simple capture`() = runTest {
-        val capture = this::class.java.getResourceAsStream("/capture.jpeg")!!
+        val capture = this::class.java.getResourceAsStream("/capture1.jpeg")!!
         val bytes = capture.readBytes()
 
         val code = antiCaptureService.solve(bytes, "image/jpeg")
 
         assertEquals("022880", code)
+    }
+
+    @Test
+    fun `parse capture and remove whitespaces`() = runTest {
+        val capture = this::class.java.getResourceAsStream("/capture2.jpeg")!!
+        val bytes = capture.readBytes()
+
+        val code = antiCaptureService.solve(bytes, "image/jpeg")
+
+        assertEquals("110047", code)
     }
 }
