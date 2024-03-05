@@ -161,21 +161,21 @@ class ConsulateHttpClient(
             header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=${orderInfo.sessionId}")
         }
 
-        val orderPage = httpResponse.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", httpResponse.status.value, orderPage)
+        val orderPageStr = httpResponse.bodyAsText()
+        log.debug("STATUS: {}, BODY {}", httpResponse.status.value, orderPageStr)
 
         // This is an email field from first page. If session was broken than it will redirect to that page
-        if (orderPage.contains("<input name=\"ctl00\$MainContent\$txtEmail\" type=\"text\"")) {
+        if (orderPageStr.contains("<input name=\"ctl00\$MainContent\$txtEmail\" type=\"text\"")) {
             throw SessionBrokenException("Redirected to the start page")
         }
 
         // Calendar widget should be on our target page
-        if (!orderPage.contains("id=\"ctl00_MainContent_Calendar\"")) {
+        if (!orderPageStr.contains("id=\"ctl00_MainContent_Calendar\"")) {
             throw SessionBrokenException("Calendar widget is not on the page")
         }
 
         // Ok, seems like we're there.
-        if (orderPage.contains("<p>Извините, но в настоящий момент на интересующее Вас консульское действие в системе предварительной записи нет свободного времени.</p>")) {
+        if (orderPageStr.contains("<p>Извините, но в настоящий момент на интересующее Вас консульское действие в системе предварительной записи нет свободного времени.</p>")) {
             return false
         } else {
             return true
