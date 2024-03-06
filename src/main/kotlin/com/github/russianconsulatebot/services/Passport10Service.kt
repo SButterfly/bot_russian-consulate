@@ -1,6 +1,9 @@
 package com.github.russianconsulatebot.services
 
 import com.github.russianconsulatebot.exceptions.WrongCaptureSessionException
+import com.github.russianconsulatebot.services.dto.Order
+import com.github.russianconsulatebot.services.dto.UserInfo
+import com.github.russianconsulatebot.services.dto.Website
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
 
