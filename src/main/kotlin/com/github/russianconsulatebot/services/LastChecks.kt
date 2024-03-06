@@ -5,7 +5,7 @@ import java.time.Instant
 import java.util.concurrent.ArrayBlockingQueue
 import java.util.concurrent.BlockingQueue
 
-private const val CAPACITY = 60
+private const val CAPACITY = 50
 
 @Service
 class LastChecks {
