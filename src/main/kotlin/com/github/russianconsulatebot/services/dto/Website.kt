@@ -1,10 +1,10 @@
 package com.github.russianconsulatebot.services.dto
 
-import java.util.TimeZone
+import java.time.ZoneId
 
 enum class Website(
     val baseUrl: String,
-    val timezone: TimeZone
+    val timezone: ZoneId
 ) {
-    HAGUE("https://hague.kdmid.ru", TimeZone.getTimeZone("Europe/Amsterdam"))
+    HAGUE("https://hague.kdmid.ru", ZoneId.of("Europe/Amsterdam"))
 }

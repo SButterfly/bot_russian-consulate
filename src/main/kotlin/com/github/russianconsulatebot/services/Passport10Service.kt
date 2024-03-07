@@ -16,14 +16,13 @@ class Passport10Service(
 ) {
     private val log = LoggerFactory.getLogger(Passport10Service::class.java)
 
-    suspend fun containsAvailableSlots() : Boolean {
+    suspend fun containsAvailableSlots(website: Website): Boolean {
         // TODO remove hardcoded values
-        val baseUrl = Website.HAGUE.baseUrl
         val order = Order("104497", "8F71F287")
 
         val userInfo = UserInfo.generateDummyUserInfo()
 
-        val sessionInfo = retry(3) { consulateHttpClient.startSession(baseUrl, userInfo) }
+        val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
         log.info("Got session: {}", sessionInfo)
         val orderPath = consulateHttpClient.passToCalendarPage(sessionInfo, "BIOPASSPORT")
         log.info("Got order path: {}", orderPath)

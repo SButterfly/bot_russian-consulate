@@ -1,5 +1,6 @@
 package com.github.russianconsulatebot.services
 
+import com.github.russianconsulatebot.services.dto.Website
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
@@ -16,6 +17,6 @@ class Passport10ServiceTest {
 
     @Test
     fun name() = runTest(timeout = Duration.INFINITE) {
-        val checkAvailableSlots = passport10Service.containsAvailableSlots()
+        val checkAvailableSlots = passport10Service.containsAvailableSlots(Website.HAGUE)
     }
 }
