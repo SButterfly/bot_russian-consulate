@@ -4,7 +4,6 @@ import com.github.russianconsulatebot.exceptions.DataErrorSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
 import com.github.russianconsulatebot.exceptions.WrongCaptureSessionException
 import com.github.russianconsulatebot.services.dto.Order
-import com.github.russianconsulatebot.services.dto.OrderInfo
 import com.github.russianconsulatebot.services.dto.PageState
 import com.github.russianconsulatebot.services.dto.SessionInfo
 import com.github.russianconsulatebot.services.dto.UserInfo
@@ -12,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.withContext
 import org.jsoup.nodes.Document
+import org.jsoup.nodes.Element
 import org.jsoup.nodes.TextNode
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -32,7 +32,6 @@ private const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
 @Service
 class ConsulateHttpClient(
     private val webClient: WebClient,
-//    private val httpClient: HttpClient,
     private val antiCaptureService: AntiCaptureService,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
@@ -83,9 +82,9 @@ class ConsulateHttpClient(
             .awaitBody<Document>()
 
         // Parse menu page
-        val errorText = parseErrorText(menuPage)
-
-        if (errorText != null) {
+        val errorTextElement = menuPage.selectFirst("#ctl00_MainContent_lblCodeErr")
+        if (errorTextElement != null) {
+            val errorText = errorTextElement.childTexts().joinToString { "\n" }
             if (errorText.contains("Символы с картинки введены не правильно")) {
                 val file = withContext(Dispatchers.IO) {
                     Files.createTempFile("capture", ".jpeg")
@@ -106,10 +105,10 @@ class ConsulateHttpClient(
     }
 
     /**
-     * Fills in any forms to get to the calendar page.
+     * Fills in any forms to get to the calendar or order page.
      * Returns url path to the consulate action. e.g. TODO
      */
-    suspend fun passToCalendarPage(sessionInfo: SessionInfo, consulateType: String): String {
+    suspend fun passToOrderPage(sessionInfo: SessionInfo, consulateType: String): String {
         log.info("Start passing forms for $consulateType and sessionInfo $sessionInfo")
 
         // Get the first page with option, which passport type we should choose
@@ -180,9 +179,9 @@ class ConsulateHttpClient(
     }
 
     /**
-     * Returns order page info, where you can see a calendar with available slots.
+     * Starts a session and returns a path to calendar page.
      */
-    suspend fun fetchOrderInfo(baseUrl: String, order: Order): OrderInfo {
+    suspend fun startCheckingAndOrder(baseUrl: String, order: Order): String {
         log.info("Starting a new session...")
         
         // Get page to check status of order
@@ -220,8 +219,13 @@ class ConsulateHttpClient(
 
         require(confirmationPageResponse.statusCode == HttpStatus.OK)
 
+        val confirmationPage = confirmationPageResponse.body!!
+        if (confirmationPage.selectFirst(":containsOwn(Ваша заявка требует  подтверждения)") != null) {
+            throw SessionException("The order is not confirmed yet")
+        }
+
         // Reparse some params
-        val (eventValidation2, viewState2) = parsePageState(confirmationPageResponse.body!!)
+        val (eventValidation2, viewState2) = parsePageState(confirmationPage)
 
         // Submit again:
         log.debug("Submitting form again...")
@@ -244,21 +248,57 @@ class ConsulateHttpClient(
             .awaitSingle()
         require(confirmationPageResponse2.statusCode == HttpStatus.FOUND)
 
-        // Get redirect page
-        val redirectPath = confirmationPageResponse2.headers[HttpHeaders.LOCATION]?.first()
-        log.info("Check URL: $redirectPath")
+        val calendarPath = confirmationPageResponse2.headers[HttpHeaders.LOCATION]?.first()
+        log.info("Calendar path: $calendarPath")
 
-        return OrderInfo(baseUrl, redirectPath!!, sessionId, order)
+        return calendarPath!!
+    }
+
+    /**
+     * Parses order from the order page.
+     */
+    suspend fun parseOrder(sessionInfo: SessionInfo, orderPagePath: String): Order {
+        log.info("Checking an order at {}", sessionInfo)
+
+        val orderPage = webClient.get()
+            .uri("${sessionInfo.baseUrl}${orderPagePath}")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .retrieve()
+            .awaitBody<Document>()
+
+        val orderInfo = orderPage.selectFirst(":containsOwn(Вы записаны в список ожидания по вопросу)")
+        if (orderInfo == null) {
+            throw SessionException("Can't find order info in the page")
+        }
+
+        val orderIdRegex = Regex("Номер заявки - (\\d+)")
+        val codeRegex = Regex("Защитный код - (\\w+)")
+
+        val childTexts = orderInfo.childTexts()
+        val orderId = childTexts.asSequence()
+            .mapNotNull { orderIdRegex.find(it) }
+            .map { it.groupValues[1] }
+            .firstOrNull()
+        val code = childTexts.asSequence()
+            .mapNotNull { codeRegex.find(it) }
+            .map { it.groupValues[1] }
+            .firstOrNull()
+
+        if (orderId == null || code == null) {
+            throw SessionException("Failed to parse order id or code in the text '${childTexts}'")
+        }
+
+        return Order(orderId, code)
     }
 
     /**
      * Checks available slots on the calendar page.
      */
-    suspend fun checkAvailableSlots(sessionInfo: SessionInfo, calendarPage: String) : Boolean {
+    suspend fun checkAvailableSlots(sessionInfo: SessionInfo, calendarPagePath: String) : Boolean {
         log.info("Checking an order at {}", sessionInfo)
 
         val orderPage = webClient.get()
-            .uri("${sessionInfo.baseUrl}${calendarPage}")
+            .uri("${sessionInfo.baseUrl}${calendarPagePath}")
             .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
             .retrieve()
             .awaitBody<Document>()
@@ -323,27 +363,28 @@ class ConsulateHttpClient(
             .toEntity(ByteArray::class.java)
             .awaitSingle()
 
-        val setCookieHeader = response.headers[HttpHeaders.SET_COOKIE]?.first()
-        val sessionId = setCookieHeader
-            ?.split(";")
+        val setCookieHeaders = response.headers[HttpHeaders.SET_COOKIE]
+        val sessionId = setCookieHeaders
+            ?.flatMap { it.split(";") }
             ?.find { it.startsWith(SESSION_ID_COOKIE) }
             ?.split("=")
             ?.get(1)
-            ?: throw RuntimeException("ASP.NET_SessionId header not found in cookies: $setCookieHeader")
+            ?: throw RuntimeException("ASP.NET_SessionId header not found in cookies: $setCookieHeaders")
 
         return Pair(response.body!!, sessionId)
     }
 
-    private fun parseErrorText(document: Document): String? {
-        val errorBlock = document.selectFirst("#ctl00_MainContent_lblCodeErr") ?: return null
-
-        val children = errorBlock.childNodes()
-        val stringBuilder = StringBuilder()
+    /**
+     * Returns a list of all child text on the element.
+     */
+    private fun Element.childTexts(): List<String> {
+        val children = this.childNodes()
+        val result = mutableListOf<String>()
         for (child in children) {
             if (child is TextNode) {
-                stringBuilder.append(child.text()).append("\n")
+                result.add(child.text())
             }
         }
-        return stringBuilder.trim().toString()
+        return result
     }
 }

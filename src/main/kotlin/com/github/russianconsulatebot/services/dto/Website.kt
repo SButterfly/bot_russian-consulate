@@ -6,5 +6,6 @@ enum class Website(
     val baseUrl: String,
     val timezone: ZoneId
 ) {
-    HAGUE("https://hague.kdmid.ru", ZoneId.of("Europe/Amsterdam"))
+    HAGUE("https://hague.kdmid.ru", ZoneId.of("Europe/Amsterdam")),
+    BELGUM("https://brussels.kdmid.ru", ZoneId.of("Europe/Brussels"))
 }
