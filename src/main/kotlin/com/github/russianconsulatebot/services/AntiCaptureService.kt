@@ -1,17 +1,17 @@
 package com.github.russianconsulatebot.services
 
-import com.fasterxml.jackson.databind.ObjectMapper
+import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.node.ArrayNode
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import com.github.russianconsulatebot.exceptions.CaptureSessionException
 import org.slf4j.LoggerFactory
 import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.awaitBody
-import java.io.File
-import java.nio.file.Files
+import java.awt.image.BufferedImage
+import java.io.ByteArrayOutputStream
+import javax.imageio.ImageIO
 import kotlin.io.encoding.Base64
 import kotlin.io.encoding.ExperimentalEncodingApi
 
@@ -24,45 +24,41 @@ import kotlin.io.encoding.ExperimentalEncodingApi
 @Service
 class AntiCaptureService(
     val webClient: WebClient,
-    val objectMapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
-
-    suspend fun solve(image: File): String {
-        val mimeType = withContext(Dispatchers.IO) {
-            Files.probeContentType(image.toPath())
-        }
-        val code = solve(image.readBytes(), mimeType)
-
-        return code
-    }
 
     /**
      * Solves capture on the image.
      */
-    /* You can test the call manually with
-        curl -X POST https://tomofi-easyocr.hf.space/api/predict/ \
-            -H 'Content-Type: application/json' \
-            -d "{\"data\": [\"data:image/jpeg;base64,$(base64 -i myFile.jpeg)\",[\"en\"]]}"
-    */
-    @OptIn(ExperimentalEncodingApi::class)
-    suspend fun solve(byteArray: ByteArray, mimeType: String): String {
+    suspend fun solve(image: BufferedImage): String {
         log.info("Start solving captcha")
+        val mimeType = "image/jpeg"
+        val base64 = toBase64(image, "jpeg")
 
-        val base64 = Base64.encode(byteArray)
+        /* You can test the call manually with
+            curl -X POST https://tomofi-easyocr.hf.space/api/predict/ \
+                -H 'Content-Type: application/json' \
+                -d "{\"data\": [\"data:image/jpeg;base64,$(base64 -i myFile.jpeg)\",[\"en\"]]}"
+        */
 
         val response = webClient.post()
             .uri("https://tomofi-easyocr.hf.space/api/predict/")
             .contentType(MediaType.APPLICATION_JSON)
             .body(BodyInserters.fromValue("{\"data\":[\"data:$mimeType;base64,$base64\",[\"en\"]]}"))
             .retrieve()
-            .awaitBody<String>()
+            .awaitBody<JsonNode>()
 
+        val code = parseResponse(response, image)
+        log.info("Code was post processed. Code: {}", code)
+        return code
+    }
+
+    private fun parseResponse(jsonNode: JsonNode, image: BufferedImage): String {
         // The response is in the form
         // {
-        //   "data": [
-        //      "data:image/jpeg;base64,BASE64",
-        //      {
+        //  "data": [
+        //    "data:image/jpeg;base64,BASE64",
+        //    {
         //      "headers": [
         //        1,
         //        2
@@ -83,25 +79,47 @@ class AntiCaptureService(
         //  ],
         //  "flag_index": null,
         //  "updated_state": null
-        //}
-        val jsonNode = objectMapper.readTree(response)
-        val parsedJsonNode = (jsonNode.get("data") as ArrayNode).get(1)
-        val valueJsonNode = ((parsedJsonNode["data"] as ArrayNode).get(0) as ArrayNode).get(0)
-        val code = valueJsonNode.asText()
+        // }
+        val dataArray = jsonNode.get("data") as ArrayNode
+        if (dataArray.size() == 1) {
+            throw CaptureSessionException("Failed to parse symbols in capture. No array with data.", image)
+        }
+        val resultsArrayNode = dataArray.get(1)["data"] as ArrayNode
+        if (resultsArrayNode.isEmpty) {
+            throw CaptureSessionException("Failed to parse symbols in capture. No probabilities", image)
+        }
 
-        log.info("Captcha solved. Code: {}", code)
+        val probabilitiesList = resultsArrayNode.map { Pair(it[0].asText(), it[1].doubleValue()) }
+        log.debug("Got list with probabilities: {}", probabilitiesList)
 
-        // keep only numbers
+        val codeCandidate = probabilitiesList
+            // sort by the length of the result, because the right answer it a bigger number
+            // and then by probability: higher -> better
+            .sortedWith(
+                compareByDescending<Pair<String, Double>> { pair -> pair.first.length }
+                    .thenByDescending { pair -> pair.second }
+            )
+            .map { pair -> pair.first }
+            .first()
+
+        // Postprocess
+
+        // 1. keep only numbers
         val stringBuilder = StringBuilder()
-        for (c in code) {
+        for (c in codeCandidate) {
             if (c.isDigit()) {
                 stringBuilder.append(c)
             }
         }
-        val trimmedCode = stringBuilder.toString()
 
-        log.info("Code was post processed. Code: {}", trimmedCode)
+        return stringBuilder.toString()
+    }
 
-        return trimmedCode
+    @OptIn(ExperimentalEncodingApi::class)
+    private fun toBase64(image: BufferedImage, formatName: String): String {
+        val arrayOutputStream = ByteArrayOutputStream()
+        ImageIO.write(image, formatName, arrayOutputStream)
+        val base64 = Base64.encode(arrayOutputStream.toByteArray())
+        return base64
     }
 }

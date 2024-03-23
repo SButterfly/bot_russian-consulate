@@ -1,15 +1,13 @@
 package com.github.russianconsulatebot.services
 
+import com.github.russianconsulatebot.exceptions.CaptureSessionException
 import com.github.russianconsulatebot.exceptions.DataErrorSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
-import com.github.russianconsulatebot.exceptions.WrongCaptureSessionException
 import com.github.russianconsulatebot.services.dto.Order
 import com.github.russianconsulatebot.services.dto.PageState
 import com.github.russianconsulatebot.services.dto.SessionInfo
 import com.github.russianconsulatebot.services.dto.UserInfo
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.reactive.awaitSingle
-import kotlinx.coroutines.withContext
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.TextNode
@@ -21,10 +19,8 @@ import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
 import org.springframework.web.reactive.function.client.awaitBody
-import java.nio.file.Files
-import kotlin.io.path.writeBytes
 
-private const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
+const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
 
 /**
  * A client that helps to navigate the website.
@@ -32,6 +28,7 @@ private const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
 @Service
 class ConsulateHttpClient(
     private val webClient: WebClient,
+    private val captureParserService: CaptureParserService,
     private val antiCaptureService: AntiCaptureService,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
@@ -51,7 +48,8 @@ class ConsulateHttpClient(
 
         // Parse the page
         val pageState = parsePageState(document)
-        val (sessionId, captchaCode, imageBytes) = parseSessionIdAndCaptureCode(baseUrl, document)
+        val (sessionId, image) = captureParserService.parseSessionIdAndCaptureImage(baseUrl, document)
+        val captchaCode = antiCaptureService.solve(image)
 
         // Submit form
         log.info("Submitting form with userInfo=$userInfo, captureCode=$captchaCode, and sessionId=$sessionId")
@@ -84,14 +82,9 @@ class ConsulateHttpClient(
         // Parse menu page
         val errorTextElement = menuPage.selectFirst("#ctl00_MainContent_lblCodeErr")
         if (errorTextElement != null) {
-            val errorText = errorTextElement.childTexts().joinToString { "\n" }
+            val errorText = errorTextElement.childTexts().joinToString("\n")
             if (errorText.contains("Символы с картинки введены не правильно")) {
-                val file = withContext(Dispatchers.IO) {
-                    Files.createTempFile("capture", ".jpeg")
-                        .apply { writeBytes(imageBytes) }
-                }
-
-                throw WrongCaptureSessionException("Capture '$captchaCode' was wrong $file")
+                throw CaptureSessionException("Capture '$captchaCode' was wrong", image)
             }
             throw DataErrorSessionException("Data error: $errorText")
         }
@@ -191,7 +184,8 @@ class ConsulateHttpClient(
             .awaitBody<Document>()
 
         val (eventValidation, viewState) = parsePageState(orderPage)
-        val (sessionId, captchaCode) = parseSessionIdAndCaptureCode(baseUrl, orderPage)
+        val (sessionId, image) = captureParserService.parseSessionIdAndCaptureImage(baseUrl, orderPage)
+        val captchaCode = antiCaptureService.solve(image)
 
         // Submit form
         log.info("Submitting form...")
@@ -325,23 +319,6 @@ class ConsulateHttpClient(
         }
     }
 
-    private suspend fun parseSessionIdAndCaptureCode(baseUrl: String, document: Document) : Triple<String, String, ByteArray> {
-        // Parse captcha image src
-        log.info("Parsing captcha image src...")
-        val imageElement = document.selectFirst("div.inp img")
-        val captchaSrc = imageElement?.attr("src") ?: throw RuntimeException("Captcha image not found")
-
-        val captchaUrl = "$baseUrl/queue/$captchaSrc"
-        log.info("Captcha url: {}", captchaUrl)
-
-        val (imageByteArray, sessionId) = fetchImageAndSessionId(captchaUrl)
-        val captchaCode = antiCaptureService.solve(imageByteArray, "image/jpeg")
-        log.info("Capture code: {}", captchaCode)
-        log.info("Session id: {}", sessionId)
-
-        return Triple(sessionId, captchaCode, imageByteArray)
-    }
-
     private fun parsePageState(document: Document) : PageState {
         log.info("Parsing state...")
         val eventValidationElement = document.selectFirst("input#__EVENTVALIDATION")
@@ -354,24 +331,6 @@ class ConsulateHttpClient(
         log.info("ViewState: {}", viewStateField)
 
         return PageState(eventValidationField, viewStateField)
-    }
-
-    private suspend fun fetchImageAndSessionId(captchaUrl: String): Pair<ByteArray, String> {
-        val response = webClient.get()
-            .uri(captchaUrl)
-            .retrieve()
-            .toEntity(ByteArray::class.java)
-            .awaitSingle()
-
-        val setCookieHeaders = response.headers[HttpHeaders.SET_COOKIE]
-        val sessionId = setCookieHeaders
-            ?.flatMap { it.split(";") }
-            ?.find { it.startsWith(SESSION_ID_COOKIE) }
-            ?.split("=")
-            ?.get(1)
-            ?: throw RuntimeException("ASP.NET_SessionId header not found in cookies: $setCookieHeaders")
-
-        return Pair(response.body!!, sessionId)
     }
 
     /**
