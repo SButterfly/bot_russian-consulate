@@ -2,6 +2,7 @@ package com.github.russianconsulatebot.services
 
 import com.github.russianconsulatebot.exceptions.CaptureSessionException
 import com.github.russianconsulatebot.exceptions.DataErrorSessionException
+import com.github.russianconsulatebot.exceptions.ExpiredSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
 import com.github.russianconsulatebot.exceptions.TooManyQuestionsSessionException
 import com.github.russianconsulatebot.services.dto.Order
@@ -297,16 +298,23 @@ class ConsulateHttpClient(
     suspend fun checkAvailableSlots(sessionInfo: SessionInfo, calendarPagePath: String) : Boolean {
         log.info("Checking an order at {}", sessionInfo)
 
-        val orderPage = webClient.get()
+        val orderResponse = webClient.get()
             .uri("${sessionInfo.baseUrl}${calendarPagePath}")
             .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
             .retrieve()
-            .awaitBody<Document>()
+            .awaitBodyEntity<Document>()
 
-        // TODO If session was broken than it will redirect to the login page
-//        if (orderPage.selectFirst("input#ctl00\$MainContent\$txtEmail") != null) {
-//            throw SessionException("Redirected to the start page")
-//        }
+        // The page can return redirected status to the start page
+        if (orderResponse.statusCode == HttpStatus.FOUND) {
+            throw ExpiredSessionException("Redirected to the start page")
+        }
+
+        val orderPage = orderResponse.body!!
+
+        // If the page was redirected to the "login" page we will see this text block
+        if (orderPage.selectFirst("#ctl00_MainContent_txtEmail") != null) {
+            throw ExpiredSessionException("Redirected to the start page")
+        }
 
         if (orderPage.selectFirst(":containsOwn(Ваша заявка заблокирована)") != null) {
             throw SessionException("Your order is blocked")
