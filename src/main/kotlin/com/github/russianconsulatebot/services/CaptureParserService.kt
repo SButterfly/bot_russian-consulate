@@ -1,6 +1,6 @@
 package com.github.russianconsulatebot.services
 
-import kotlinx.coroutines.reactive.awaitSingle
+import com.github.russianconsulatebot.utils.awaitBodyEntity
 import org.jsoup.nodes.Document
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
@@ -50,8 +50,7 @@ class CaptureParserService(
         val response = webClient.get()
             .uri(captchaUrl)
             .retrieve()
-            .toEntity(ByteArray::class.java)
-            .awaitSingle()
+            .awaitBodyEntity<ByteArray>()
 
         val setCookieHeaders = response.headers[HttpHeaders.SET_COOKIE]
         val sessionId = setCookieHeaders
