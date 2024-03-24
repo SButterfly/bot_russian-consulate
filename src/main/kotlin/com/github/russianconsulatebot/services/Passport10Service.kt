@@ -26,6 +26,7 @@ private const val CALENDAR_PAGE = "/queue/SPCalendar.aspx"
 @Service
 class Passport10Service(
     private val consulateHttpClient: ConsulateHttpClient,
+    private val lastChecks: LastChecks,
 ) {
     private val log = LoggerFactory.getLogger(Passport10Service::class.java)
 
@@ -62,6 +63,8 @@ class Passport10Service(
         log.info("Starting a new session")
         val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
         log.info("Got session: {}", sessionInfo)
+        lastChecks.push("Started a new session: ${sessionInfo.sessionId}")
+
         val calendarPath = consulateHttpClient.passToOrderPage(sessionInfo, BIOPASSPORT)
         log.info("Got order path: {}", calendarPath)
         if (calendarPath != CALENDAR_PAGE) {
