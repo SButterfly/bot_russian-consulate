@@ -33,9 +33,6 @@ dependencies {
 	// Add telegram bot
 	implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
 
-	// Anti-captcha client
-	implementation("com.github.2captcha:2captcha-java:1.1.1")
-
 	// HTML page parser
 	implementation("org.jsoup:jsoup:1.17.1")
 
