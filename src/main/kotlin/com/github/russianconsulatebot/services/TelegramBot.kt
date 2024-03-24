@@ -7,7 +7,6 @@ import com.github.kotlintelegrambot.dispatcher.command
 import com.github.kotlintelegrambot.dispatcher.telegramError
 import com.github.kotlintelegrambot.dispatcher.text
 import com.github.kotlintelegrambot.entities.ChatId
-import com.github.kotlintelegrambot.entities.ParseMode.MARKDOWN_V2
 import com.github.kotlintelegrambot.logging.LogLevel
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
@@ -96,20 +95,11 @@ class TelegramBot(
         }
     }
 
-    fun sendMessage(chatId: Long, message: String, isSilent: Boolean = false) {
+    suspend fun sendMessage(chatId: Long, message: String, isSilent: Boolean = false) {
         bot.sendMessage(
             ChatId.fromId(chatId),
             text = message,
             disableNotification = isSilent
-        )
-    }
-
-    fun sendMarkdownMessage(chatId: Long, message: String, isSilent: Boolean = false) {
-        bot.sendMessage(
-            ChatId.fromId(chatId),
-            text = message,
-            disableNotification = isSilent,
-            parseMode = MARKDOWN_V2,
         )
     }
 }
