@@ -127,6 +127,7 @@ class ConsulateHttpClient(
                         add("__EVENTTARGET", "")
                         add("__EVENTARGUMENT", "")
                         add("__VIEWSTATE", orderPageState.viewState)
+                        add("__PREVIOUSPAGE", orderPageState.previousPage)
                         add("__EVENTVALIDATION", orderPageState.eventValidation)
                         add("ctl00\$MainContent\$RList", "$consulateType;PSSP")
                         add("ctl00\$MainContent\$CheckBoxID", "on")
@@ -142,6 +143,7 @@ class ConsulateHttpClient(
                     .selectFirst(":containsOwn(Превышено ограничение на количество вопросов)") != null) {
                 throw TooManyQuestionsSessionException("To many questions")
             }
+            throw SessionException("The response should be redirected to another page")
         }
 
         val secondConfirmPage = webClient.get()
@@ -164,6 +166,7 @@ class ConsulateHttpClient(
                         add("__EVENTTARGET", "")
                         add("__EVENTARGUMENT", "")
                         add("__VIEWSTATE", confirmationState.viewState)
+                        add("__PREVIOUSPAGE", confirmationState.previousPage)
                         add("__EVENTVALIDATION", confirmationState.eventValidation)
                         add("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
                     }
@@ -341,10 +344,14 @@ class ConsulateHttpClient(
         val viewStateElement = document.selectFirst("input#__VIEWSTATE")
         val viewStateField = viewStateElement?.attr("value") ?: ""
 
+        val prevPageElement = document.selectFirst("input#__PREVIOUSPAGE")
+        val prevPageField = prevPageElement?.attr("value") ?: ""
+
         log.info("EventValidation code: {}", eventValidationField)
         log.info("ViewState: {}", viewStateField)
+        log.info("Previous page: {}", prevPageField)
 
-        return PageState(eventValidationField, viewStateField)
+        return PageState(eventValidationField, viewStateField, prevPageField)
     }
 
     /**
