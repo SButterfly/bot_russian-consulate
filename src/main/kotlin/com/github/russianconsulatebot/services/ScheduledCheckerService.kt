@@ -16,7 +16,7 @@ import java.time.Instant
 class ScheduledCheckerService(
     private val checkSlotsDispatcher: ExecutorCoroutineDispatcher,
     private val passport10Service: Passport10Service,
-    private val telegramBotService: TelegramBotService,
+    private val telegramBot: TelegramBot,
     @Value("\${scheduler.charIds:}") private val chatIds: List<Long>,
     private val lastChecks: LastChecks,
 ) {
@@ -60,7 +60,7 @@ class ScheduledCheckerService(
 
             if (availableSlots) {
                 for (chatId in chatIds) {
-                    telegramBotService.sendMessage(
+                    telegramBot.sendMessage(
                         chatId,
                         "Found available passport for 10 years slots on https://hague.kdmid.ru/ !!!"
                     )

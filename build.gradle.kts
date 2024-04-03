@@ -32,7 +32,7 @@ dependencies {
 	implementation("org.jetbrains.kotlinx:kotlinx-coroutines-reactor")
 
 	// Add telegram bot
-	implementation("com.github.pengrad:java-telegram-bot-api:7.1.1")
+	implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
 
 	// HTML page parser
 	implementation("org.jsoup:jsoup:1.17.1")

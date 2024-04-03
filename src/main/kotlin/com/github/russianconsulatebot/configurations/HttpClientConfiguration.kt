@@ -11,13 +11,13 @@ import reactor.netty.http.client.HttpClient
 import reactor.netty.transport.logging.AdvancedByteBufFormat
 
 @Configuration
-class HttpClientConfig {
+class HttpClientConfiguration {
 
     @Bean
     fun webClient() : WebClient {
         // log request and response
         val httpClient = HttpClient.create()
-            .wiretap(HttpClientConfig::class.java.canonicalName, LogLevel.DEBUG, AdvancedByteBufFormat.TEXTUAL)
+            .wiretap(HttpClientConfiguration::class.java.canonicalName, LogLevel.DEBUG, AdvancedByteBufFormat.TEXTUAL)
 
         return WebClient.builder()
             .clientConnector(ReactorClientHttpConnector(httpClient))
