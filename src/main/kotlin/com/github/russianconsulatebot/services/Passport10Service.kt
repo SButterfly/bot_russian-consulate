@@ -1,7 +1,6 @@
 package com.github.russianconsulatebot.services
 
 import com.github.russianconsulatebot.exceptions.CaptureSessionException
-import com.github.russianconsulatebot.exceptions.ExpiredSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
 import com.github.russianconsulatebot.services.dto.SessionInfo
 import com.github.russianconsulatebot.services.dto.UserInfo
@@ -35,19 +34,20 @@ class Passport10Service(
 
     suspend fun containsAvailableSlots(website: Website): Boolean {
         // remove cached session info, as we treat every cached session as broken
-        val cachedSessionInfo = map.remove(website)
-        if (cachedSessionInfo != null) {
-            log.info("Found cached session info: {}", cachedSessionInfo)
-            try {
-                val hasSlots = consulateHttpClient.checkAvailableSlots(cachedSessionInfo, CALENDAR_PAGE)
-                log.info("Has windows {}", hasSlots)
-                // restore cache info, as it's still alive
-                map[website] = cachedSessionInfo
-                return hasSlots
-            } catch (e: ExpiredSessionException) {
-                log.info("The current session is expired. Create a new one")
-            }
-        }
+        // TODO checking existing window is not working
+//        val cachedSessionInfo = map.remove(website)
+//        if (cachedSessionInfo != null) {
+//            log.info("Found cached session info: {}", cachedSessionInfo)
+//            try {
+//                val hasSlots = consulateHttpClient.checkAvailableSlots(cachedSessionInfo, CALENDAR_PAGE)
+//                log.info("Has windows {}", hasSlots)
+//                // restore cache info, as it's still alive
+//                map[website] = cachedSessionInfo
+//                return hasSlots
+//            } catch (e: ExpiredSessionException) {
+//                log.info("The current session is expired. Create a new one")
+//            }
+//        }
 
         val userInfo = UserInfo.generateDummyUserInfo()
         log.info("Starting a new session")
