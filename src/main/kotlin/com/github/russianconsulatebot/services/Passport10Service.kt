@@ -2,7 +2,6 @@ package com.github.russianconsulatebot.services
 
 import com.github.russianconsulatebot.exceptions.CaptureSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
-import com.github.russianconsulatebot.services.dto.SessionInfo
 import com.github.russianconsulatebot.services.dto.UserInfo
 import com.github.russianconsulatebot.services.dto.Website
 import kotlinx.coroutines.Dispatchers
@@ -12,7 +11,6 @@ import org.springframework.stereotype.Service
 import java.awt.image.BufferedImage
 import java.io.FileOutputStream
 import java.nio.file.Files
-import java.util.concurrent.ConcurrentHashMap
 import javax.imageio.ImageIO
 
 private const val BIOPASSPORT = "BIOPASSPORT"
@@ -26,34 +24,14 @@ private const val WAITLIST_PAGE = "/queue/waitlist.aspx"
 @Service
 class Passport10Service(
     private val consulateHttpClient: ConsulateHttpClient,
-    private val lastChecks: LastChecks,
 ) {
     private val log = LoggerFactory.getLogger(Passport10Service::class.java)
 
-    private val map = ConcurrentHashMap<Website, SessionInfo>()
-
     suspend fun containsAvailableSlots(website: Website): Boolean {
-        // remove cached session info, as we treat every cached session as broken
-        // TODO checking existing window is not working
-//        val cachedSessionInfo = map.remove(website)
-//        if (cachedSessionInfo != null) {
-//            log.info("Found cached session info: {}", cachedSessionInfo)
-//            try {
-//                val hasSlots = consulateHttpClient.checkAvailableSlots(cachedSessionInfo, CALENDAR_PAGE)
-//                log.info("Has windows {}", hasSlots)
-//                // restore cache info, as it's still alive
-//                map[website] = cachedSessionInfo
-//                return hasSlots
-//            } catch (e: ExpiredSessionException) {
-//                log.info("The current session is expired. Create a new one")
-//            }
-//        }
-
         val userInfo = UserInfo.generateDummyUserInfo()
         log.info("Starting a new session")
         val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
         log.info("Got session: {}", sessionInfo)
-        lastChecks.push("Started a new session: ${sessionInfo.sessionId}")
 
         val calendarPath = consulateHttpClient.passToOrderPage(sessionInfo, BIOPASSPORT)
         log.info("Got order path: {}", calendarPath)
@@ -66,7 +44,6 @@ class Passport10Service(
 
         val hasSlots = consulateHttpClient.checkAvailableSlots(sessionInfo, CALENDAR_PAGE)
         log.info("Has windows {}", hasSlots)
-        map[website] = sessionInfo
         return hasSlots
     }
 

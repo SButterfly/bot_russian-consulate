@@ -48,13 +48,18 @@ class TelegramBot(
                 }
 
                 text("log") {
+                    val successful = lastChecks.successfulNumberOfAttempts
+                    val totalNumber = lastChecks.totalNumberOfAttempts
+                    val rate = successful * 100 / (totalNumber.takeIf { it != 0 } ?: 1)
+                    val stats = "Successful attempts: $successful/$totalNumber ($rate%)"
+
                     val checks = lastChecks.get().joinToString("\n") { "* $it" }
                     // No more, that 4096 symbols in total, so keep last entries
-                    val trimmedText = checks.substring(max(checks.length - 4000, 0), checks.length)
+                    val trimmedText = checks.substring(max(checks.length - 3900, 0), checks.length)
 
                     val result = bot.sendMessage(
                         chatId = ChatId.fromId(message.chat.id),
-                        text = "Last checks:\n$trimmedText"
+                        text = "Last checks:\n$trimmedText\n\n$stats"
                     )
                     result.fold(
                         {
