@@ -112,6 +112,10 @@ class AntiCaptureService(
             }
         }
 
+        if (stringBuilder.length != 6) {
+            throw CaptureSessionException("Expected to parse 6 symbols on capture, got '$stringBuilder'", image)
+        }
+
         return stringBuilder.toString()
     }
 
