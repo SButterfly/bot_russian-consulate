@@ -42,8 +42,6 @@ class ConsulateHttpClient(
      * Logins in the system and returns session information.
      */
     suspend fun startSession(baseUrl: String, userInfo: UserInfo): SessionInfo {
-        log.info("Starting new session...")
-
         // Get initial page with captcha
         val document = webClient.get()
             .uri("$baseUrl/queue/visitor.aspx")

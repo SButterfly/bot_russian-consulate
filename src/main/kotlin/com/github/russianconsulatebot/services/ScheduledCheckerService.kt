@@ -29,7 +29,7 @@ class ScheduledCheckerService(
         // which resulted that business code was running in reactor thread (reactor-http-nio-*)
         // To solve it, we explicitly set dispatcher, that is made from scheduler dispatcher
         withContext(checkSlotsDispatcher) {
-            log.debug("Started day check")
+            log.debug("Started a day check")
             val website = Website.HAGUE
             if (isNightTime(website)) {
                 log.debug("Stopped day check, because it's a night at {}", website)
@@ -42,7 +42,7 @@ class ScheduledCheckerService(
     @Scheduled(cron = "\${scheduler.night_cron}", scheduler = "checkSlotsExecutor")
     suspend fun nightScheduler() {
         withContext(checkSlotsDispatcher) {
-            log.debug("Started night check")
+            log.debug("Started a night check")
             val website = Website.HAGUE
             if (!isNightTime(website)) {
                 log.debug("Stopped night check, because it's a day at {}", website)

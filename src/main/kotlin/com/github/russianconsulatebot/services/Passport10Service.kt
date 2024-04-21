@@ -43,7 +43,7 @@ class Passport10Service(
         }
 
         val hasSlots = consulateHttpClient.checkAvailableSlots(sessionInfo, CALENDAR_PAGE)
-        log.info("Has windows {}", hasSlots)
+        log.info("Has windows: {}", hasSlots)
         return hasSlots
     }
 
