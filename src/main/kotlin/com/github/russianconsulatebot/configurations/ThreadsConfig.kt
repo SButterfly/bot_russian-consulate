@@ -25,26 +25,13 @@ class ThreadsConfig {
      * For scheduled tasks to check current state of the system.
      */
     @Bean
-    fun checkSlotsExecutor(): ScheduledExecutorService {
-        // No parallelization is expected on the check slots, thus we use a single thread
-        return Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "check-slots")}
+    fun businessLogicExecutor(): ScheduledExecutorService {
+        // Experiment: Use one thread for all business process to use full power of COROUTINES !!!
+        return Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "business-logic-thread")}
     }
 
     @Bean
-    fun checkSlotsDispatcher(): ExecutorCoroutineDispatcher {
-        return checkSlotsExecutor().asCoroutineDispatcher()
-    }
-
-    /**
-     * For background checks of the telegram updates.
-     */
-    @Bean
-    fun telegramUpdatesExecutor(): ExecutorService {
-        return Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "telegram-bot")}
-    }
-
-    @Bean
-    fun telegramUpdatesDispatcher(): ExecutorCoroutineDispatcher {
-        return telegramUpdatesExecutor().asCoroutineDispatcher()
+    fun businessLogicCoroutineDispatcher(): ExecutorCoroutineDispatcher {
+        return businessLogicExecutor().asCoroutineDispatcher()
     }
 }
