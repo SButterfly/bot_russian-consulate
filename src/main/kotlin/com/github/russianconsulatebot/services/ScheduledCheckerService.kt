@@ -8,6 +8,7 @@ import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
 import org.springframework.stereotype.Service
 import java.time.Instant
+import java.time.format.DateTimeFormatter
 
 /**
  * Checker that finds available slots.
@@ -59,16 +60,22 @@ class ScheduledCheckerService(
             val availableSlots = passport10Service.containsAvailableSlots(website)
             log.info("Found available slots for notary: {}", availableSlots)
 
-            if (availableSlots) {
+            if (availableSlots.isNotEmpty()) {
+                val slotsStr = availableSlots
+                    .joinToString("\n") {
+                        val dateTimeStr = it.dateTime.format(DateTimeFormatter.ofPattern("yyyy.MM.dd hh:mm"))
+                        return@joinToString "* $dateTimeStr ${it.description}"
+                    }
+
                 for (chatId in chatIds) {
                     telegramBotService.sendMessage(
                         chatId,
-                        "Found available passport for 10 years slots on https://hague.kdmid.ru/ !!!"
+                        "Found available passport for 10 years slots on https://hague.kdmid.ru/ !!!\n$slotsStr"
                     )
                 }
             }
 
-            lastChecks.push("Found slot: $availableSlots")
+            lastChecks.push("Found ${availableSlots.size} slots")
             lastChecks.incSuccess()
         } catch (e: Exception) {
             log.error("Got an error", e)
