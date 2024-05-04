@@ -17,6 +17,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import org.slf4j.LoggerFactory
+import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
 import kotlin.math.max
 
@@ -25,6 +26,8 @@ class TelegramBotService(
     private val bot: TelegramBot,
     private val lastChecks: LastChecks,
     private val businessLogicCoroutineDispatcher: ExecutorCoroutineDispatcher,
+    @Value("\${telegram_bot.enabled:true}")
+    private val startTelegramBot: Boolean,
 ) {
     private val scope: CoroutineScope = CoroutineScope(businessLogicCoroutineDispatcher)
     private val log = LoggerFactory.getLogger(TelegramBotService::class.java)
@@ -34,6 +37,10 @@ class TelegramBotService(
 
     @PostConstruct
     fun start() {
+        if (!startTelegramBot) {
+            return
+        }
+
         log.info("Starting GetUpdates telegram background process")
         job?.cancel()
 
@@ -59,6 +66,10 @@ class TelegramBotService(
 
     @PreDestroy
     fun stop() {
+        if (!startTelegramBot) {
+            return
+        }
+
         log.info("Cancelling telegram background process")
         job?.cancel()
         log.info("Cancelled telegram background process")
