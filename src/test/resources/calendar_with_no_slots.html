@@ -1,0 +1,327 @@
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Запись на прием
+    </title>
+    <link rel="icon" href="/favicon.ico" type="image/x-icon"/>
+    <link rel="shortcut icon" href="/favicon.ico" type="image/x-icon"/>
+    <link rel="stylesheet" type="text/css" href="css/Styles.css?v=01"/>
+    <link rel="stylesheet" type="text/css" href="css/StyleSheet.css?v=01"/>
+    <script src="JScripts/SetCookie.js" type="text/javascript"></script>
+    <script type="text/javascript" src="JScripts/reload.js"></script>
+    <script type="text/javascript">
+        <!--
+        function onClickItem(id) {
+            //try{
+            var lb1 = document.getElementById(id);
+            var checked = lb1.checked;
+            var value = lb1.value;
+            var tb1 = document.getElementById("ctl00_MainContent_TextBox1");
+            var bttn1 = document.getElementById("ctl00_MainContent_Button1");
+            if (checked) {
+                tb1.value = value;
+                bttn1.disabled = false;
+            }
+            //} catch(e) { lb1.checked = false; bttn1.disabled = true;}
+        }
+        //-->
+    </script>
+</head>
+<body>
+<noscript>
+    <div style="opacity: 0.5; background: #000; height: 100%; position: fixed; width: 100%; z-index: 5;"></div>
+    <div style="left: 50%; top: 50%; margin-left: -330px; margin-top: -100px; opacity: 1; z-index: 20; width: 30em !important; position: fixed; padding: 30px; background: #ef4545; color: #fff; -moz-border-radius: 1px 10px; -webkit-border-radius: 1px 10px; border-radius: 1px 10px; font-size: 20px;">
+        В Вашем браузере отключен Javascript.<br>Для входа в систему необходимо включить Javascript и cookies или обновить браузер, чтобы он поддерживал эти настройки.
+
+    </div>
+</noscript>
+<div id="fade" style="display: none; opacity: 0.5; background: #000; height: 100%; position: fixed; width: 100%; z-index: 5;"></div>
+<div id="no_cookie" style="left: 50%; top: 50%; margin-left: -330px; margin-top: -100px; display: none; opacity: 1; z-index: 20; width: 30em !important; position: fixed; padding: 30px; background: #ef4545; color: #fff; -moz-border-radius: 1px 10px; -webkit-border-radius: 1px 10px; border-radius: 1px 10px; font-size: 20px;">
+    В Вашем браузере отключены cookies.<br>Для входа в систему необходимо включить Javascript и cookies или обновить браузер, чтобы он поддерживал эти настройки.
+
+</div>
+<div id="body">
+    <div id="top">
+        <span></span>
+    </div>
+    <div id="hdr">
+        <div id="hdr2">
+            <div class="gerb"></div>
+            <span class=header>
+                        <div class="text">
+                            Консульский отдел Посольства <br>
+                            Российской Федерации<br>
+                            в Нидерландах (Гаага)<br/>
+                            <br/>
+                            <span style="font-size:15px; color:#fff;">Система электронной записи на прием</span>
+                        </div>
+                    </span>
+        </div>
+    </div>
+    <div id="desk">
+        <form name="aspnetForm" method="post" action="SPCalendar.aspx" id="aspnetForm">
+            <div>
+                <input type="hidden" name="__EVENTTARGET" id="__EVENTTARGET" value=""/>
+                <input type="hidden" name="__EVENTARGUMENT" id="__EVENTARGUMENT" value=""/>
+                <input type="hidden" name="__VIEWSTATE" id="__VIEWSTATE" value="/wEPDwULLTExMzMxMTA2MzMPFgYeCWRheXNfaW5mbzLSAQABAAAA/////wEAAAAAAAAADAIAAAA+dzNxYmFzZSwgVmVyc2lvbj0xLjAuMC4wLCBDdWx0dXJlPW5ldXRyYWwsIFB1YmxpY0tleVRva2VuPW51bGwFAQAAACF3M3FiYXNlLlF1ZXVlLl9jYWxlbmRhcl9kYXlzX2luZm8CAAAACWZpcnN0X2RheQNjbnQABw0IAgAAAAAAd6MobtyICQMAAAAPAwAAAAkAAAAIAQAAAAcAAAAAAAAAAAAAAAAAAAAAAAAAAQAAAAEAAAABAAAACx4Mc2Vzc2lvbl9pbmZvBsCsCKgdbNyIHglRdWV1ZUluZm8UKVN3M3FiYXNlLlF1ZXVlLl9pbmZvLCB3M3FiYXNlLCBWZXJzaW9uPTEuMC4wLjAsIEN1bHR1cmU9bmV1dHJhbCwgUHVibGljS2V5VG9rZW49bnVsbAEylAEAAQAAAP////8BAAAAAAAAAAwCAAAAPnczcWJhc2UsIFZlcnNpb249MS4wLjAuMCwgQ3VsdHVyZT1uZXV0cmFsLCBQdWJsaWNLZXlUb2tlbj1udWxsBQEAAAATdzNxYmFzZS5RdWV1ZS5faW5mbwIAAAAJcmVjZXB0aW9uAmR0AAAIDQIAAAAXAAAAALa9tpBu3AgLFgJmD2QWAgIFD2QWAgIBD2QWBAIDDzwrAAoBAA8WBB4LVmlzaWJsZURhdGUGAMgpfg9u3IgeAlNEFgEGAEC0IoRw3AhkZAILDxBkEBUAFQAUKwMAZGRkYkyMUZv7gEBgeXf/EYUy5do4pHk="/>
+            </div>
+            <script type="text/javascript">
+                //<![CDATA[
+                var theForm = document.forms['aspnetForm'];
+                if (!theForm) {
+                    theForm = document.aspnetForm;
+                }
+                function __doPostBack(eventTarget, eventArgument) {
+                    if (!theForm.onsubmit || (theForm.onsubmit() != false)) {
+                        theForm.__EVENTTARGET.value = eventTarget;
+                        theForm.__EVENTARGUMENT.value = eventArgument;
+                        theForm.submit();
+                    }
+                }
+                //]]>
+            </script>
+            <div>
+                <input type="hidden" name="__EVENTVALIDATION" id="__EVENTVALIDATION" value="/wEWWQKw/+DMCwKqgvnsAgLUqO/uBwKbh5bPDwKbh5bPDwKbh4riBgKbh4riBgKbh/6GDQKbh/6GDQKbh5LuCAKbh5LuCAKbh4aFBwKbh4aFBwK0rpCqBAK0rpCqBAK0roTBDAK0roTBDAK0rvjlCwK0rvjlCwK0ruy4AgK0ruy4AgK0rsDfCgK0rsDfCgK0rrTyAQK0rrTyAQK0rqiJCAK0rqiJCAK0rpysBwK0rpysBwK0rrCVAgK0rrCVAgK0rqSoCQK0rqSoCQLzzeXeDALzzeXeDALzzdn1CwLzzdn1CwLzzc2IAgLzzc2IAgLzzaGvCQLzzaGvCQLzzZXCAQLzzZXCAQLzzYmZCALzzYmZCALzzf29BwLzzf29BwLzzdHQDwLzzdHQDwLzzYW4CQLzzYW4CQLzzfncAQLzzfncAQKM9IvEBgKM9IvEBgKM9P+YDQKM9P+YDQKM9NO/BAKM9NO/BAKM9MfSDAKM9MfSDAKM9LvpCwKM9LvpCwKM9K+MAgKM9K+MAgKM9IOjCQKM9IOjCQKM9PfHAQKM9PfHAQKM9KuvAwKM9KuvAwKM9J/CCwKM9J/CCwKp46nrCAKp46nrCAKp452OBwKp452OBwKp4/GiDgKp4/GiDgKp4+X5BgKp4+X5BgKp49mcDQKp49mcDQKp482zBAKp482zBAKp46HWDAKp46HWDALT8MqYCALR49OXDUi0TvT/MfLWqHEFEW5lKnBjKQC2"/>
+            </div>
+            <div id="atten2">
+                <span style="font-weight:bold;font-size:15px;color:#FFF;">Внимание! </span>
+                Для записи на прием необходимо выбрать  <b>время приема</b>
+                и нажать кнопку  <b>"Записаться на прием" </b>
+            </div>
+            <table>
+                <tr>
+                    <td id="left-panel">
+                        <table id="ctl00_MainContent_Calendar" cellspacing="0" cellpadding="4" title="Календарь" border="0" style="width:200px;height:180px;font-size:8pt;font-family:Verdana;color:Black;border-width:1px;border-style:solid;border-color:#999999;background-color:White;border-collapse:collapse;margin-left:58px;">
+                            <tr>
+                                <td colspan="7" style="background-color:#999999;border-color:Black;">
+                                    <table cellspacing="0" border="0" style="color:Black;font-family:Verdana;font-size:8pt;font-weight:bold;width:100%;border-collapse:collapse;">
+                                        <tr>
+                                            <td valign="bottom" style="width:15%;">
+                                                <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','V8857')" style="color:Black" title="Перейти к предыдущему месяцу">&lt;</a>
+                                            </td>
+                                            <td align="center" style="width:70%;">Май 2024</td>
+                                            <td align="right" valign="bottom" style="width:15%;">
+                                                <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','V8918')" style="color:Black" title="Перейти к следующему месяцу">&gt;</a>
+                                            </td>
+                                        </tr>
+                                    </table>
+                                </td>
+                            </tr>
+                            <tr>
+                                <th align="center" abbr="понедельник" scope="col" style="background-color:#CCCCCC;font-size:7pt;font-weight:bold;">Пн</th>
+                                <th align="center" abbr="вторник" scope="col" style="background-color:#CCCCCC;font-size:7pt;font-weight:bold;">Вт</th>
+                                <th align="center" abbr="среда" scope="col" style="background-color:#CCCCCC;font-size:7pt;font-weight:bold;">Ср</th>
+                                <th align="center" abbr="четверг" scope="col" style="background-color:#CCCCCC;font-size:7pt;font-weight:bold;">Чт</th>
+                                <th align="center" abbr="пятница" scope="col" style="background-color:#CCCCCC;font-size:7pt;font-weight:bold;">Пт</th>
+                                <th align="center" abbr="суббота" scope="col" style="background-color:#CCCCCC;font-size:7pt;font-weight:bold;">Сб</th>
+                                <th align="center" abbr="воскресенье" scope="col" style="background-color:#CCCCCC;font-size:7pt;font-weight:bold;">Вс</th>
+                            </tr>
+                            <tr>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8885')" style="color:Gray" title="апреля 29">29</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8886')" style="color:Gray" title="апреля 30">30</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8887')" style="color:Black" title="мая 01">1</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8888')" style="color:Black" title="мая 02">2</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8889')" style="color:Black" title="мая 03">3</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Black;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8890')" style="color:Black" title="мая 04">4</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8891')" style="color:Black" title="мая 05">5</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8892')" style="color:Black" title="мая 06">6</a>
+                                </td>
+                                <td align="center" style="width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8893')" style="color:Black" title="мая 07">7</a>
+                                </td>
+                                <td align="center" style="width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8894')" style="color:Black" title="мая 08">8</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8895')" style="color:Black" title="мая 09">9</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:White;background-color:LightSeaGreen;font-weight:bold;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8896')" style="color:White" title="мая 10">10</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8897')" style="color:Black" title="мая 11">11</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8898')" style="color:Black" title="мая 12">12</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td align="center" style="width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8899')" style="color:Black" title="мая 13">13</a>
+                                </td>
+                                <td align="center" style="width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8900')" style="color:Black" title="мая 14">14</a>
+                                </td>
+                                <td align="center" style="width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8901')" style="color:Black" title="мая 15">15</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8902')" style="color:Black" title="мая 16">16</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8903')" style="color:Black" title="мая 17">17</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8904')" style="color:Black" title="мая 18">18</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8905')" style="color:Black" title="мая 19">19</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8906')" style="color:Black" title="мая 20">20</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8907')" style="color:Black" title="мая 21">21</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8908')" style="color:Black" title="мая 22">22</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8909')" style="color:Black" title="мая 23">23</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8910')" style="color:Black" title="мая 24">24</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8911')" style="color:Black" title="мая 25">25</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8912')" style="color:Black" title="мая 26">26</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8913')" style="color:Black" title="мая 27">27</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8914')" style="color:Black" title="мая 28">28</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8915')" style="color:Black" title="мая 29">29</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8916')" style="color:Black" title="мая 30">30</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8917')" style="color:Black" title="мая 31">31</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8918')" style="color:Gray" title="июня 01">1</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8919')" style="color:Gray" title="июня 02">2</a>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8920')" style="color:Gray" title="июня 03">3</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8921')" style="color:Gray" title="июня 04">4</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8922')" style="color:Gray" title="июня 05">5</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8923')" style="color:Gray" title="июня 06">6</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8924')" style="color:Gray" title="июня 07">7</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8925')" style="color:Gray" title="июня 08">8</a>
+                                </td>
+                                <td disabled="disabled" align="center" style="color:Gray;background-color:LightSeaGreen;width:14%;">
+                                    <a href="javascript:__doPostBack('ctl00$MainContent$Calendar','8926')" style="color:Gray" title="июня 09">9</a>
+                                </td>
+                            </tr>
+                        </table>
+                        <br/>
+                        <br/>
+                        <input type="submit" name="ctl00$MainContent$Button1" value="Записаться на прием" id="ctl00_MainContent_Button1" disabled="disabled" class="btn" style="width:212px;margin-left:52px;"/>
+                        <br/>
+                        <br/>
+                        <div class="box_instruction">
+                            <p>
+                                Для выбора даты используйте календарь.<br/>
+                                <br/>
+                                Запись возможна на дни, выделенные белым цветом. Серым цветом будет
+                                выделен выбранный день.<br/>
+                                <br/>
+                                <b>Зарезервируйте время для посещения</b>
+                                по выбранному вопросу <b>в правой колонке</b>
+                                . Нажмите кнопку «Записаться на прием».<br/>
+                                <br/>
+                                Если доступное время <b>Вас не устраивает</b>
+                                , Вы можете <b>зарегистрироваться в списке ожидания</b>
+                                . Ссылка для входа в систему для записи на прием будет направлена Вам на электронную почту. <a href='waitlist.aspx'>Зарегистрироваться.</a>
+                            </p>
+                        </div>
+                        <div class="box_instruction" style=" background-color: #cde4cf;">
+                            <p>
+                                <b>Уважаемые посетители! </b>
+                                При работе с сайтом записи на прием необходимо использовать только навигацию сайта. Во избежание потери данных о записи не используйте кнопку браузера «На предыдущую страницу».
+                            </p>
+                        </div>
+                    </td>
+                    <td id="center-panel">
+                        <br/>
+                        <br/>
+                    </td>
+                </tr>
+            </table>
+            <!--
+<p><b style="color: red">Внимание!  </b>Для записи на прием необходимо выбрать  <b>время приема</b> и нажать кнопку  <b>"Записаться на прием" </b>.
+-->
+            <div style="visibility: hidden">
+                <span id="ctl00_MainContent_lblResultMsg">lblResultMsg</span>
+                <input name="ctl00$MainContent$TextBox1" type="text" id="ctl00_MainContent_TextBox1"/>
+                <span id="ctl00_MainContent_Label_Message">Label_Message</span>
+            </div>
+        </form>
+        <div style="clear:both;"></div>
+    </div>
+    <div id="footer">
+        <div class="rightfooter">
+            <p>
+                © Сайт КД МИД России "Запись на прием в КЗУ" <br/>2015 - 2024
+            </p>
+        </div>
+        <div style="clear:both;"></div>
+    </div>
+</div>
+<script>
+
+    document.cookie = "testcookie";
+    cookieEnabled = (document.cookie.indexOf("testcookie") != -1) ? true : false;
+    if (!cookieEnabled) {
+        document.getElementById('fade').style.display = '';
+        document.getElementById('no_cookie').style.display = '';
+        document.forms[0].onsubmit = function() {
+
+            return false;
+
+        }
+    }
+</script>
+</body>
+</html>
