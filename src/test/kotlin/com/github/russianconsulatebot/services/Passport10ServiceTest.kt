@@ -5,8 +5,10 @@ import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
+import org.springframework.test.context.ActiveProfiles
 import kotlin.time.Duration
 
+@ActiveProfiles("integration-test")
 @SpringBootTest
 @org.junit.jupiter.api.Disabled("Disabled as it does a heavy work")
 class Passport10ServiceTest {
