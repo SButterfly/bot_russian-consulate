@@ -1,30 +1,30 @@
 package com.github.russianconsulatebot.services
 
-import com.github.russianconsulatebot.utils.awaitBodyEntity
+import com.github.russianconsulatebot.utils.executeAsync
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.client.WebClient
 import java.awt.Image
 import java.awt.image.BufferedImage
 import java.io.ByteArrayInputStream
 import javax.imageio.ImageIO
-
 
 /**
  * Service to find capture-image on a page.
  */
 @Service
 class CaptureParserService(
-    private val webClient: WebClient,
+    private val consulateOkHttpClient: OkHttpClient,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
     /**
      * Parses session_id and capture image.
      */
-    suspend fun parseSessionIdAndCaptureImage(baseUrl: String, document: Document) : Pair<String, BufferedImage> {
+    suspend fun parseSessionIdAndCaptureImage(baseUrl: String, document: Document): Pair<String, BufferedImage> {
         log.info("Parsing captcha image src...")
         val imageElement = document.selectFirst("div.inp img")
         val captchaSrc = imageElement?.attr("src") ?: throw RuntimeException("Captcha image not found")
@@ -47,20 +47,21 @@ class CaptureParserService(
     }
 
     private suspend fun fetchSessionIdAndImage(captchaUrl: String): Pair<String, ByteArray> {
-        val response = webClient.get()
-            .uri(captchaUrl)
-            .retrieve()
-            .awaitBodyEntity<ByteArray>()
+        val response = consulateOkHttpClient.newCall(
+            Request.Builder()
+                .url(captchaUrl)
+                .build()
+        )
+            .executeAsync()
 
         val setCookieHeaders = response.headers[HttpHeaders.SET_COOKIE]
-        val sessionId = setCookieHeaders
-            ?.flatMap { it.split(";") }
+        val sessionId = setCookieHeaders?.split(";")
             ?.find { it.startsWith(SESSION_ID_COOKIE) }
             ?.split("=")
             ?.get(1)
             ?: throw RuntimeException("ASP.NET_SessionId header not found in cookies: $setCookieHeaders")
 
-        return Pair(sessionId, response.body!!)
+        return Pair(sessionId, response.body!!.bytes())
     }
 
     /**

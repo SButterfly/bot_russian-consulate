@@ -1,19 +1,20 @@
 package com.github.russianconsulatebot.services
 
+import com.fasterxml.jackson.databind.ObjectMapper
 import kotlinx.coroutines.test.runTest
+import okhttp3.OkHttpClient
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
-import org.springframework.web.reactive.function.client.WebClient
 import javax.imageio.ImageIO
 
 class AntiCaptureServiceIntegrationTest {
 
-    lateinit var antiCaptureService: AntiCaptureService
+    private lateinit var antiCaptureService: AntiCaptureService
 
     @BeforeEach
     fun setUp() {
-        antiCaptureService = AntiCaptureService(WebClient.create())
+        antiCaptureService = AntiCaptureService(OkHttpClient(), ObjectMapper())
     }
 
     @Test

@@ -11,8 +11,11 @@ import com.github.russianconsulatebot.services.dto.SessionInfo
 import com.github.russianconsulatebot.services.dto.UserInfo
 import com.github.russianconsulatebot.utils.PageParser
 import com.github.russianconsulatebot.utils.Slot
-import com.github.russianconsulatebot.utils.awaitBodyEntity
-import kotlinx.coroutines.reactive.awaitSingle
+import com.github.russianconsulatebot.utils.executeAsync
+import com.github.russianconsulatebot.utils.parseDocument
+import okhttp3.MultipartBody
+import okhttp3.OkHttpClient
+import okhttp3.Request
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
 import org.jsoup.nodes.TextNode
@@ -20,11 +23,7 @@ import org.slf4j.LoggerFactory
 import org.springframework.http.HttpHeaders
 import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import org.springframework.util.LinkedMultiValueMap
-import org.springframework.web.reactive.function.BodyInserters
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.awaitBodilessEntity
-import org.springframework.web.reactive.function.client.awaitBody
+
 
 const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
 
@@ -33,7 +32,7 @@ const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
  */
 @Service
 class ConsulateHttpClient(
-    private val webClient: WebClient,
+    private val consulateOkHttpClient: OkHttpClient,
     private val captureParserService: CaptureParserService,
     private val antiCaptureService: AntiCaptureService,
 ) {
@@ -45,10 +44,14 @@ class ConsulateHttpClient(
      */
     suspend fun startSession(baseUrl: String, userInfo: UserInfo): SessionInfo {
         // Get initial page with captcha
-        val document = webClient.get()
-            .uri("$baseUrl/queue/visitor.aspx")
-            .retrieve()
-            .awaitBody<Document>()
+        val document = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("$baseUrl/queue/visitor.aspx")
+                    .build()
+            )
+            .executeAsync()
+            .parseDocument()
 
         // Parse the page
         val pageState = parsePageState(document)
@@ -57,31 +60,35 @@ class ConsulateHttpClient(
 
         // Submit form
         log.info("Submitting form with userInfo=$userInfo, captureCode=$captchaCode, and sessionId=$sessionId")
-        val menuPage = webClient.post()
-            .uri("$baseUrl/queue/visitor.aspx")
-            .cookie(SESSION_ID_COOKIE, sessionId)
-            .body(BodyInserters.fromFormData(
-                LinkedMultiValueMap<String, String>()
-                    .apply {
-                        add("__EVENTTARGET", "")
-                        add("__EVENTARGUMENT", "")
-                        add("__VIEWSTATE", pageState.viewState)
-                        add("__EVENTVALIDATION", pageState.eventValidation)
-                        add("ctl00\$MainContent\$txtFam", userInfo.firstName)
-                        add("ctl00\$MainContent\$txtIm", userInfo.secondName)
-                        add("ctl00\$MainContent\$txtOt", userInfo.patronymic ?: "")
-                        add("ctl00\$MainContent\$txtTel", userInfo.phoneNumber)
-                        add("ctl00\$MainContent\$txtEmail", userInfo.email)
-                        add("ctl00\$MainContent\$DDL_Day", userInfo.dateOfBirthStr)
-                        add("ctl00\$MainContent\$DDL_Month", userInfo.monthOfBirthStr)
-                        add("ctl00\$MainContent\$TextBox_Year", userInfo.yearOfBirthStr)
-                        add("ctl00\$MainContent\$DDL_Mr", userInfo.title.name)
-                        add("ctl00\$MainContent\$txtCode", captchaCode)
-                        add("ctl00\$MainContent\$ButtonA", "Далее")
-                    }
-            ))
-            .retrieve()
-            .awaitBody<Document>()
+        val menuPage = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("$baseUrl/queue/visitor.aspx")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=$sessionId")
+                    .post(
+                        MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("__EVENTTARGET", "")
+                            .addFormDataPart("__EVENTARGUMENT", "")
+                            .addFormDataPart("__VIEWSTATE", pageState.viewState)
+                            .addFormDataPart("__EVENTVALIDATION", pageState.eventValidation)
+                            .addFormDataPart("ctl00\$MainContent\$txtFam", userInfo.firstName)
+                            .addFormDataPart("ctl00\$MainContent\$txtIm", userInfo.secondName)
+                            .addFormDataPart("ctl00\$MainContent\$txtOt", userInfo.patronymic ?: "")
+                            .addFormDataPart("ctl00\$MainContent\$txtTel", userInfo.phoneNumber)
+                            .addFormDataPart("ctl00\$MainContent\$txtEmail", userInfo.email)
+                            .addFormDataPart("ctl00\$MainContent\$DDL_Day", userInfo.dateOfBirthStr)
+                            .addFormDataPart("ctl00\$MainContent\$DDL_Month", userInfo.monthOfBirthStr)
+                            .addFormDataPart("ctl00\$MainContent\$TextBox_Year", userInfo.yearOfBirthStr)
+                            .addFormDataPart("ctl00\$MainContent\$DDL_Mr", userInfo.title.name)
+                            .addFormDataPart("ctl00\$MainContent\$txtCode", captchaCode)
+                            .addFormDataPart("ctl00\$MainContent\$ButtonA", "Далее")
+                            .build()
+                    )
+                    .build()
+            )
+            .executeAsync()
+            .parseDocument()
 
         // Parse menu page
         val errorTextElement = menuPage.selectFirst("#ctl00_MainContent_lblCodeErr")
@@ -110,42 +117,51 @@ class ConsulateHttpClient(
         log.info("Start passing forms for $consulateType and sessionInfo $sessionInfo")
 
         // Get the first page with option, which passport type we should choose
-        val orderPage = webClient.get()
-            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx?nm=$consulateType")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .retrieve()
-            .awaitBody<Document>()
+        val orderPage = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}/queue/Rlist.aspx?nm=$consulateType")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .build()
+            )
+            .executeAsync()
+            .parseDocument()
 
         val orderPageState = parsePageState(orderPage)
 
         // Submit the chosen option
-        val submitResponse = webClient.post()
-            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx?nm=$consulateType")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .body(BodyInserters.fromFormData(
-                LinkedMultiValueMap<String, String>()
-                    .apply {
-                        add("__EVENTTARGET", "")
-                        add("__EVENTARGUMENT", "")
-                        add("__VIEWSTATE", orderPageState.viewState)
-                        add("__PREVIOUSPAGE", orderPageState.previousPage)
-                        add("__EVENTVALIDATION", orderPageState.eventValidation)
-                        add("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
-                    }
-            ))
-            .retrieve()
-            .awaitBodyEntity<Document>()
+        val submitResponse = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}/queue/Rlist.aspx?nm=$consulateType")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .post(
+                        MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("__EVENTTARGET", "")
+                            .addFormDataPart("__EVENTARGUMENT", "")
+                            .addFormDataPart("__VIEWSTATE", orderPageState.viewState)
+                            .addFormDataPart("__PREVIOUSPAGE", orderPageState.previousPage)
+                            .addFormDataPart("__EVENTVALIDATION", orderPageState.eventValidation)
+                            .addFormDataPart("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
+                            .build()
+                    )
+                    .build()
+            )
+            .executeAsync()
 
         // It should redirect to the page with Calendar
-        if (submitResponse.statusCode != HttpStatus.FOUND) {
-            if (submitResponse.body!!
-                    .selectFirst(":containsOwn(Превышено ограничение на количество вопросов)") != null) {
+        if (submitResponse.code != HttpStatus.FOUND.value()) {
+            val submitDocument = submitResponse.parseDocument()
+            if (submitDocument
+                    .selectFirst(":containsOwn(Превышено ограничение на количество вопросов)") != null
+            ) {
                 throw TooManyQuestionsSessionException("To many questions")
             }
             throw SessionException("The response should be redirected to another page")
         }
 
-        val calendarPath = submitResponse.headers[HttpHeaders.LOCATION]?.first()
+        val calendarPath = submitResponse.headers[HttpHeaders.LOCATION]
         log.info("Calendar path: $calendarPath")
 
         return calendarPath!!
@@ -160,74 +176,90 @@ class ConsulateHttpClient(
         log.info("Start passing forms for $consulateType and sessionInfo $sessionInfo")
 
         // Get the first page with option, which passport type we should choose
-        val orderPage = webClient.get()
-            .uri("${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .retrieve()
-            .awaitBody<Document>()
+        val orderPage = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .build()
+            )
+            .executeAsync()
+            .parseDocument()
 
         val orderPageState = parsePageState(orderPage)
 
         // Submit with adult params
-        val submitResponse = webClient.post()
-            .uri("${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .body(BodyInserters.fromFormData(
-                LinkedMultiValueMap<String, String>()
-                    .apply {
-                        add("__EVENTTARGET", "")
-                        add("__EVENTARGUMENT", "")
-                        add("__VIEWSTATE", orderPageState.viewState)
-                        add("__PREVIOUSPAGE", orderPageState.previousPage)
-                        add("__EVENTVALIDATION", orderPageState.eventValidation)
-                        add("ctl00\$MainContent\$RList", "$consulateType;PSSP")
-                        add("ctl00\$MainContent\$CheckBoxID", "on")
-                        add("ctl00\$MainContent\$ButtonA", "Далее")
-                    }
-            ))
-            .retrieve()
-            .awaitBodyEntity<Document>()
+        val submitResponse = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .post(
+                        MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("__EVENTTARGET", "")
+                            .addFormDataPart("__EVENTARGUMENT", "")
+                            .addFormDataPart("__VIEWSTATE", orderPageState.viewState)
+                            .addFormDataPart("__PREVIOUSPAGE", orderPageState.previousPage)
+                            .addFormDataPart("__EVENTVALIDATION", orderPageState.eventValidation)
+                            .addFormDataPart("ctl00\$MainContent\$RList", "$consulateType;PSSP")
+                            .addFormDataPart("ctl00\$MainContent\$CheckBoxID", "on")
+                            .addFormDataPart("ctl00\$MainContent\$ButtonA", "Далее")
+                            .build()
+                    )
+                    .build()
+            )
+            .executeAsync()
 
         // It should redirect to the page with Confirmation
-        if (submitResponse.statusCode != HttpStatus.FOUND) {
-            if (submitResponse.body!!
-                    .selectFirst(":containsOwn(Превышено ограничение на количество вопросов)") != null) {
+        if (submitResponse.code != HttpStatus.FOUND.value()) {
+            val submitDocument = submitResponse.parseDocument()
+            if (submitDocument
+                    .selectFirst(":containsOwn(Превышено ограничение на количество вопросов)") != null
+            ) {
                 throw TooManyQuestionsSessionException("To many questions")
             }
             throw SessionException("The response should be redirected to another page")
         }
 
-        val secondConfirmPage = webClient.get()
-            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .retrieve()
-            .awaitBody<Document>()
+        val secondConfirmPage = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}/queue/Rlist.aspx")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .build()
+            )
+            .executeAsync()
+            .parseDocument()
 
         val confirmationState = parsePageState(secondConfirmPage)
 
         // TODO Add check, that such order already exists in the system
 
         log.info("Sending second confirmation")
-        val submitResponse2 = webClient.post()
-            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .body(BodyInserters.fromFormData(
-                LinkedMultiValueMap<String, String>()
-                    .apply {
-                        add("__EVENTTARGET", "")
-                        add("__EVENTARGUMENT", "")
-                        add("__VIEWSTATE", confirmationState.viewState)
-                        add("__PREVIOUSPAGE", confirmationState.previousPage)
-                        add("__EVENTVALIDATION", confirmationState.eventValidation)
-                        add("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
-                    }
-            ))
-            .retrieve()
-            .awaitBodilessEntity()
+        val submitResponse2 = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}/queue/Rlist.aspx")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .post(
+                        MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("__EVENTTARGET", "")
+                            .addFormDataPart("__EVENTARGUMENT", "")
+                            .addFormDataPart("__VIEWSTATE", confirmationState.viewState)
+                            .addFormDataPart("__PREVIOUSPAGE", confirmationState.previousPage)
+                            .addFormDataPart("__EVENTVALIDATION", confirmationState.eventValidation)
+                            .addFormDataPart("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
+                            .build()
+                    )
+                    .build()
+            )
+            .executeAsync()
 
-        require(submitResponse2.statusCode == HttpStatus.FOUND)
+        require(submitResponse2.code == HttpStatus.FOUND.value())
 
-        val calendarPath = submitResponse2.headers[HttpHeaders.LOCATION]?.first()
+        val calendarPath = submitResponse2.headers[HttpHeaders.LOCATION]
         log.info("Calendar path: $calendarPath")
 
         return calendarPath!!
@@ -238,12 +270,16 @@ class ConsulateHttpClient(
      */
     suspend fun startCheckingAndOrder(baseUrl: String, order: Order): String {
         log.info("Starting a new session...")
-        
+
         // Get page to check status of order
-        val orderPage = webClient.get()
-            .uri("$baseUrl/queue/orderinfo.aspx")
-            .retrieve()
-            .awaitBody<Document>()
+        val orderPage = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("$baseUrl/queue/orderinfo.aspx")
+                    .build()
+            )
+            .executeAsync()
+            .parseDocument()
 
         val (eventValidation, viewState) = parsePageState(orderPage)
         val (sessionId, image) = captureParserService.parseSessionIdAndCaptureImage(baseUrl, orderPage)
@@ -251,30 +287,32 @@ class ConsulateHttpClient(
 
         // Submit form
         log.info("Submitting form...")
-        val confirmationPageResponse = webClient.post()
-            .uri("$baseUrl/queue/orderinfo.aspx")
-            .cookie(SESSION_ID_COOKIE, sessionId)
-            .body(BodyInserters.fromFormData(
-                LinkedMultiValueMap<String, String>()
-                    .apply {
-                        add("__EVENTTARGET", "")
-                        add("__EVENTARGUMENT", "")
-                        add("__VIEWSTATE", viewState)
-                        add("__EVENTVALIDATION", eventValidation)
-                        add("ctl00\$MainContent\$txtID", order.orderNumber)
-                        add("ctl00\$MainContent\$txtUniqueID", order.code)
-                        add("ctl00\$MainContent\$txtCode", captchaCode)
-                        add("ctl00\$MainContent\$ButtonA", "Далее")
-                        add("ctl00\$MainContent\$FeedbackClientID", "0")
-                        add("ctl00\$MainContent\$FeedbackOrderID", "0")
-                    }
-            ))
-            .retrieve()
-            .awaitBodyEntity<Document>()
+        val confirmationPageResponse = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("$baseUrl/queue/orderinfo.aspx")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionId}")
+                    .post(
+                        MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("__EVENTARGUMENT", "")
+                            .addFormDataPart("__VIEWSTATE", viewState)
+                            .addFormDataPart("__EVENTVALIDATION", eventValidation)
+                            .addFormDataPart("ctl00\$MainContent\$txtID", order.orderNumber)
+                            .addFormDataPart("ctl00\$MainContent\$txtUniqueID", order.code)
+                            .addFormDataPart("ctl00\$MainContent\$txtCode", captchaCode)
+                            .addFormDataPart("ctl00\$MainContent\$ButtonA", "Далее")
+                            .addFormDataPart("ctl00\$MainContent\$FeedbackClientID", "0")
+                            .addFormDataPart("ctl00\$MainContent\$FeedbackOrderID", "0")
+                            .build()
+                    )
+                    .build()
+            )
+            .executeAsync()
 
-        require(confirmationPageResponse.statusCode == HttpStatus.OK)
+        require(confirmationPageResponse.code == HttpStatus.OK.value())
 
-        val confirmationPage = confirmationPageResponse.body!!
+        val confirmationPage = confirmationPageResponse.parseDocument()
         if (confirmationPage.selectFirst(":containsOwn(Ваша заявка требует  подтверждения)") != null) {
             throw SessionException("The order is not confirmed yet")
         }
@@ -284,26 +322,28 @@ class ConsulateHttpClient(
 
         // Submit again:
         log.debug("Submitting form again...")
-        val confirmationPageResponse2 = webClient.post()
-            .uri("$baseUrl/queue/orderinfo.aspx")
-            .cookie(SESSION_ID_COOKIE, sessionId)
-            .body(BodyInserters.fromFormData(
-                LinkedMultiValueMap<String, String>()
-                    .apply {
-                        add("__EVENTTARGET", "")
-                        add("__EVENTARGUMENT", "")
-                        add("__VIEWSTATE", viewState2)
-                        add("__EVENTVALIDATION", eventValidation2)
-                        add("ctl00\$MainContent\$ButtonB.x", "133")
-                        add("ctl00\$MainContent\$ButtonB.y", "30")
-                    }
-            ))
-            .retrieve()
-            .toBodilessEntity()
-            .awaitSingle()
-        require(confirmationPageResponse2.statusCode == HttpStatus.FOUND)
+        val confirmationPageResponse2 = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("$baseUrl/queue/orderinfo.aspx")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionId}")
+                    .post(
+                        MultipartBody.Builder()
+                            .setType(MultipartBody.FORM)
+                            .addFormDataPart("__EVENTTARGET", "")
+                            .addFormDataPart("__EVENTARGUMENT", "")
+                            .addFormDataPart("__VIEWSTATE", viewState2)
+                            .addFormDataPart("__EVENTVALIDATION", eventValidation2)
+                            .addFormDataPart("ctl00\$MainContent\$ButtonB.x", "133")
+                            .addFormDataPart("ctl00\$MainContent\$ButtonB.y", "30")
+                            .build()
+                    )
+                    .build()
+            )
+            .executeAsync()
+        require(confirmationPageResponse2.code == HttpStatus.FOUND.value())
 
-        val calendarPath = confirmationPageResponse2.headers[HttpHeaders.LOCATION]?.first()
+        val calendarPath = confirmationPageResponse2.headers[HttpHeaders.LOCATION]
         log.info("Calendar path: $calendarPath")
 
         return calendarPath!!
@@ -315,11 +355,15 @@ class ConsulateHttpClient(
     suspend fun parseOrder(sessionInfo: SessionInfo, orderPagePath: String): Order {
         log.info("Checking an order at {}", sessionInfo)
 
-        val orderPage = webClient.get()
-            .uri("${sessionInfo.baseUrl}${orderPagePath}")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .retrieve()
-            .awaitBody<Document>()
+        val orderPage = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}${orderPagePath}")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .build()
+            )
+            .executeAsync()
+            .parseDocument()
 
         val orderInfo = orderPage.selectFirst(":containsOwn(Вы записаны в список ожидания по вопросу)")
         if (orderInfo == null) {
@@ -351,21 +395,22 @@ class ConsulateHttpClient(
      */
     suspend fun checkSlots(sessionInfo: SessionInfo, calendarPagePath: String): List<Slot> {
         log.info("Checking an order at {}", sessionInfo)
-
-        val orderResponse = webClient.get()
-            .uri("${sessionInfo.baseUrl}${calendarPagePath}")
-            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-            .retrieve()
-            .awaitBodyEntity<Document>()
+        val orderResponse = consulateOkHttpClient
+            .newCall(
+                Request.Builder()
+                    .url("${sessionInfo.baseUrl}${calendarPagePath}")
+                    .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                    .build()
+            )
+            .executeAsync()
 
         // The page can return redirected status to the start page
-        if (orderResponse.statusCode == HttpStatus.FOUND) {
+        if (orderResponse.code == HttpStatus.FOUND.value()) {
             throw ExpiredSessionException("Redirected to the start page")
         }
 
-        val orderPage = orderResponse.body!!
-
         // If the page was redirected to the "login" page we will see this text block
+        val orderPage = orderResponse.parseDocument()
         if (orderPage.selectFirst("#ctl00_MainContent_txtEmail") != null) {
             throw ExpiredSessionException("Redirected to the start page")
         }
@@ -412,20 +457,24 @@ class ConsulateHttpClient(
             }
 
             log.debug("Requesting slots for {} day", day.date)
-            val dayPage = webClient.post()
-                .uri("${sessionInfo.baseUrl}${calendarPagePath}")
-                .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
-                .body(BodyInserters.fromFormData(
-                    LinkedMultiValueMap<String, String>()
-                        .apply {
-                            add("__EVENTTARGET", day.eventTarget)
-                            add("__EVENTARGUMENT", day.eventArgument)
-                            add("__VIEWSTATE", calendarPageState.viewState)
-                            add("__EVENTVALIDATION", calendarPageState.eventValidation)
-                        }
-                ))
-                .retrieve()
-                .awaitBody<Document>()
+            val dayPage = consulateOkHttpClient
+                .newCall(
+                    Request.Builder()
+                        .url("${sessionInfo.baseUrl}${calendarPagePath}")
+                        .addHeader(HttpHeaders.COOKIE, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
+                        .post(
+                            MultipartBody.Builder()
+                                .setType(MultipartBody.FORM)
+                                .addFormDataPart("__EVENTTARGET", day.eventTarget)
+                                .addFormDataPart("__EVENTARGUMENT", day.eventArgument)
+                                .addFormDataPart("__VIEWSTATE", calendarPageState.viewState)
+                                .addFormDataPart("__EVENTVALIDATION", calendarPageState.eventValidation)
+                                .build()
+                        )
+                        .build()
+                )
+                .executeAsync()
+                .parseDocument()
 
             val slots = PageParser.parseSlots(dayPage)
             resultSlots.addAll(slots)
@@ -434,7 +483,7 @@ class ConsulateHttpClient(
         return resultSlots
     }
 
-    private fun parsePageState(document: Document) : PageState {
+    private fun parsePageState(document: Document): PageState {
         log.info("Parsing state...")
         val eventValidationElement = document.selectFirst("input#__EVENTVALIDATION")
         val eventValidationField = eventValidationElement?.attr("value") ?: ""
