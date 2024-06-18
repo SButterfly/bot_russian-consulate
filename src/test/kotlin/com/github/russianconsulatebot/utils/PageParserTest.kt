@@ -53,7 +53,7 @@ class PageParserTest {
             Slot(LocalDateTime.parse("2024-05-08T12:30"), "Окно 2"),
             Slot(LocalDateTime.parse("2024-05-08T12:35"), "Окно 2"),
             Slot(LocalDateTime.parse("2024-05-08T12:40"), "Окно 2"),
-            Slot(LocalDateTime.parse("2024-05-08T12:15"), "Окно 3"),
+            Slot(LocalDateTime.parse("2024-07-01T09:00"), "Окно 3"),
             Slot(LocalDateTime.parse("2024-05-08T12:20"), "Окно 3"),
             Slot(LocalDateTime.parse("2024-05-08T12:25"), "Окно 3"),
             Slot(LocalDateTime.parse("2024-05-08T12:30"), "Окно 3"),
