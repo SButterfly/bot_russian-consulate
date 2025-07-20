@@ -17,7 +17,8 @@ import org.springframework.stereotype.Service
 
 @Service
 class TelegramBot(
-    @Value("\${telegram.api_key}") val apiKey: String
+    @Value("\${telegram.api_key:}") val apiKey: String,
+    private val lastChecks: LastChecks,
 ) {
     lateinit var bot: Bot
     private val log = LoggerFactory.getLogger(this::class.java)
@@ -46,6 +47,13 @@ class TelegramBot(
                     )
                 }
 
+                text("log") {
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(message.chat.id),
+                        text = "Last checks:\n${lastChecks.get().joinToString("\n") { "* $it" }}"
+                    )
+                }
+
                 text("ping") {
                     bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Pong")
                 }
@@ -56,12 +64,16 @@ class TelegramBot(
             }
         }
 
-        bot.startPolling()
+        if (apiKey.isNotBlank()) {
+            bot.startPolling()
+        }
     }
 
     @PreDestroy
     fun destroy() {
-        bot.stopPolling()
+        if (apiKey.isNotBlank()) {
+            bot.stopPolling()
+        }
     }
 
     fun sendMessage(chatId: Long, message: String, isSilent: Boolean = false) {
