@@ -58,7 +58,7 @@ class ScheduledCheckerService(
             val availableSlots = passport10Service.containsAvailableSlots(website)
             log.info("Found available slots for notary: {}", availableSlots)
 
-            if (availableSlots || true) {
+            if (availableSlots) {
                 for (chatId in chatIds) {
                     telegramBotService.sendMessage(
                         chatId,
