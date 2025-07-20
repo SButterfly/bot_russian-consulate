@@ -91,6 +91,17 @@ class AntiCaptureService(
 
         log.info("Captcha solved. Code: {}", code)
 
-        return code
+        // keep only numbers
+        val stringBuilder = StringBuilder()
+        for (c in code) {
+            if (c.isDigit()) {
+                stringBuilder.append(c)
+            }
+        }
+        val trimmedCode = stringBuilder.toString()
+
+        log.info("Code was post processed. Code: {}", trimmedCode)
+
+        return trimmedCode
     }
 }
