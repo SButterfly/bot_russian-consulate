@@ -52,7 +52,9 @@ class TelegramBotService(
             while (true) {
                 try {
                     val lastUpdateId = processRequest(request)
-                    request = request.offset(lastUpdateId + 1)
+                    if (lastUpdateId != null) {
+                        request = request.offset(lastUpdateId + 1)
+                    }
                 } catch (e: Exception) {
                     log.error("Got an exception trying to process for {} timeout secs and {} offset",
                         request.timeout, request.offset, e)
@@ -75,7 +77,7 @@ class TelegramBotService(
         log.info("Cancelled telegram background process")
     }
 
-    private suspend fun processRequest(request: GetUpdates): Int {
+    private suspend fun processRequest(request: GetUpdates): Int? {
         log.debug("Started a check for {} timeout secs and {} offset",
             request.timeout, request.offset)
 
@@ -96,7 +98,7 @@ class TelegramBotService(
             }
         }
 
-        return updates.last().updateId()
+        return updates.lastOrNull()?.updateId()
     }
 
     private suspend fun processUpdate(update: Update) {
