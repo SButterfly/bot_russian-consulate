@@ -29,3 +29,9 @@ ssh root@188.166.87.53 "docker stop bot && docker rm bot; docker run --name=bot 
 ssh root@188.166.87.53
 ```
 
+# How to read logs
+
+```bash
+docker logs -f --tail 1000 bot
+```
+
