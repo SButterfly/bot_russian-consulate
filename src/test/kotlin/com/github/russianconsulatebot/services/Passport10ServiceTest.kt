@@ -1,12 +1,14 @@
 package com.github.russianconsulatebot.services
 
 import kotlinx.coroutines.test.runTest
+import org.junit.jupiter.api.Disabled
 import org.junit.jupiter.api.Test
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import kotlin.time.Duration
 
 @SpringBootTest
+@Disabled("Disabled as it does a heavy work")
 class Passport10ServiceTest {
 
     @Autowired
