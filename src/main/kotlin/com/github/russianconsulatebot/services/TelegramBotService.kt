@@ -7,6 +7,7 @@ import com.pengrad.telegrambot.request.GetUpdates
 import com.pengrad.telegrambot.request.SendMessage
 import jakarta.annotation.PostConstruct
 import jakarta.annotation.PreDestroy
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.ExecutorCoroutineDispatcher
 import kotlinx.coroutines.Job
@@ -31,7 +32,10 @@ class TelegramBotService(
     @PostConstruct
     fun start() {
         job?.cancel()
-        job = scope.launch {
+        val handler = CoroutineExceptionHandler { _, exception ->
+            log.error("Caught $exception during telegram job runner", exception)
+        }
+        job = scope.launch(context = handler) {
             var request = GetUpdates().timeout(30) // secs
             while (true) {
                 log.debug("Started a check for {} timeout secs and {} offset",
