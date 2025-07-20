@@ -14,7 +14,7 @@ import java.time.Instant
  */
 @Service
 class ScheduledCheckerService(
-    private val checkSlotsDispatcher: ExecutorCoroutineDispatcher,
+    private val businessLogicCoroutineDispatcher: ExecutorCoroutineDispatcher,
     private val passport10Service: Passport10Service,
     private val telegramBotService: TelegramBotService,
     @Value("\${scheduler.charIds:}")
@@ -23,12 +23,12 @@ class ScheduledCheckerService(
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
-    @Scheduled(cron = "\${scheduler.day_cron}", scheduler = "checkSlotsExecutor")
+    @Scheduled(cron = "\${scheduler.day_cron}", scheduler = "businessLogicExecutor")
     suspend fun dayScheduler() {
         // By default, Scheduler is starting a new suspend function in Unconfined dispatcher (https://t.ly/udrQi)
         // which resulted that business code was running in reactor thread (reactor-http-nio-*)
         // To solve it, we explicitly set dispatcher, that is made from scheduler dispatcher
-        withContext(checkSlotsDispatcher) {
+        withContext(businessLogicCoroutineDispatcher) {
             log.debug("Started a day check")
             val website = Website.HAGUE
             if (isNightTime(website)) {
@@ -39,9 +39,9 @@ class ScheduledCheckerService(
         }
     }
 
-    @Scheduled(cron = "\${scheduler.night_cron}", scheduler = "checkSlotsExecutor")
+    @Scheduled(cron = "\${scheduler.night_cron}", scheduler = "businessLogicExecutor")
     suspend fun nightScheduler() {
-        withContext(checkSlotsDispatcher) {
+        withContext(businessLogicCoroutineDispatcher) {
             log.debug("Started a night check")
             val website = Website.HAGUE
             if (!isNightTime(website)) {

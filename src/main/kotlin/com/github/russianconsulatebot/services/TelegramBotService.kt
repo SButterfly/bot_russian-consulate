@@ -24,9 +24,9 @@ import kotlin.math.max
 class TelegramBotService(
     private val bot: TelegramBot,
     private val lastChecks: LastChecks,
-    private val telegramUpdatesDispatcher: ExecutorCoroutineDispatcher,
+    private val businessLogicCoroutineDispatcher: ExecutorCoroutineDispatcher,
 ) {
-    private val scope: CoroutineScope = CoroutineScope(telegramUpdatesDispatcher)
+    private val scope: CoroutineScope = CoroutineScope(businessLogicCoroutineDispatcher)
     private val log = LoggerFactory.getLogger(TelegramBotService::class.java)
 
     @Volatile
