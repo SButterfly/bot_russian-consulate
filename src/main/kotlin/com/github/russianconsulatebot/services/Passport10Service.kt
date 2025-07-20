@@ -2,7 +2,6 @@ package com.github.russianconsulatebot.services
 
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
-import java.time.LocalDateTime
 
 /**
  * Check availability on the passport 10.
@@ -15,13 +14,14 @@ class Passport10Service(
 
     suspend fun containsAvailableSlots() : Boolean {
         // TODO remove hardcoded values
-        val baseUrl = "https://hague.kdmid.ru"
+        val baseUrl = Website.HAGUE.baseUrl
         val order = Order("104497", "8F71F287")
 
-        val orderInfo = consulateHttpClient.fetchOrderInfo(baseUrl, order)
-        log.info("Found order info: {}", orderInfo)
+        val userInfo = UserInfo.generateDummyUserInfo()
 
-        val hasWindows = consulateHttpClient.checkOrder(orderInfo)
+        val sessionInfo = consulateHttpClient.startSession(baseUrl, userInfo)
+        val orderPath = consulateHttpClient.passToCalendarPage(sessionInfo, "BIOPASSPORT")
+        val hasWindows = consulateHttpClient.checkAvailableSlots(sessionInfo, orderPath)
         return hasWindows
     }
 }
