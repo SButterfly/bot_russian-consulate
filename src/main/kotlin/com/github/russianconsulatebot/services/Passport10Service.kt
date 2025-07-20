@@ -16,7 +16,7 @@ class Passport10Service(
     suspend fun containsAvailableSlots() : Boolean {
         // TODO remove hardcoded values
         val baseUrl = "https://hague.kdmid.ru"
-        val order = Order("104491", "86764D40")
+        val order = Order("104497", "8F71F287")
 
         val orderInfo = consulateHttpClient.fetchOrderInfo(baseUrl, order)
         log.info("Found order info: {}", orderInfo)

@@ -16,15 +16,22 @@ java {
 
 repositories {
 	mavenCentral()
+	// For kotlin-telegram-bot
+	maven("https://jitpack.io")
 }
 
 dependencies {
 	// Spring
 	implementation("org.springframework.boot:spring-boot-starter")
 	implementation("org.springframework.boot:spring-boot-starter-webflux")
-
-	runtimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.8.0")
+	// kotlin reflection is needed for spring to run
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
+
+	// To enable webflux to coroutines communication
+	runtimeOnly("org.jetbrains.kotlinx:kotlinx-coroutines-reactor:1.8.0")
+
+	// Add telegram bot
+	implementation("io.github.kotlin-telegram-bot.kotlin-telegram-bot:telegram:6.1.0")
 
 	// Anti-captcha client
 	implementation("com.github.2captcha:2captcha-java:1.1.1")
@@ -39,7 +46,6 @@ dependencies {
 	implementation("org.jsoup:jsoup:1.17.1")
 
 	testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.0")
-	testImplementation("org.springframework.boot:spring-boot-starter-test")
 }
 
 tasks.withType<KotlinCompile> {
