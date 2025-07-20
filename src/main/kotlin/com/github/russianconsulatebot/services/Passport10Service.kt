@@ -19,6 +19,7 @@ import javax.imageio.ImageIO
 private const val BIOPASSPORT = "BIOPASSPORT"
 
 private const val CALENDAR_PAGE = "/queue/SPCalendar.aspx"
+private const val WAITLIST_PAGE = "/queue/waitlist.aspx"
 
 /**
  * Check availability on the passport 10.
@@ -33,17 +34,6 @@ class Passport10Service(
     private val map = ConcurrentHashMap<Website, SessionInfo>()
 
     suspend fun containsAvailableSlots(website: Website): Boolean {
-        when (website) {
-            Website.HAGUE -> {
-                return simpleCheck(website)
-            }
-            Website.BELGUM -> {
-                return checkWithEmailConfirmation(website)
-            }
-        }
-    }
-
-    private suspend fun simpleCheck(website: Website): Boolean {
         // remove cached session info, as we treat every cached session as broken
         val cachedSessionInfo = map.remove(website)
         if (cachedSessionInfo != null) {
@@ -67,6 +57,9 @@ class Passport10Service(
 
         val calendarPath = consulateHttpClient.passToOrderPage(sessionInfo, BIOPASSPORT)
         log.info("Got order path: {}", calendarPath)
+        if (calendarPath == WAITLIST_PAGE) {
+            throw IllegalStateException("Page '$calendarPath' is not supported yet")
+        }
         if (calendarPath != CALENDAR_PAGE) {
             throw IllegalStateException("Expected $calendarPath to be equal $CALENDAR_PAGE")
         }
@@ -75,24 +68,6 @@ class Passport10Service(
         log.info("Has windows {}", hasSlots)
         map[website] = sessionInfo
         return hasSlots
-    }
-
-    private suspend fun checkWithEmailConfirmation(website: Website): Boolean {
-        val userInfo = UserInfo.generateDummyUserInfo()
-        val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
-        log.info("Got session: {}", sessionInfo)
-        val orderPath = consulateHttpClient.passToOrderPage(sessionInfo, BIOPASSPORT)
-        log.info("Got order path: {}", orderPath)
-        val order = consulateHttpClient.parseOrder(sessionInfo, orderPath)
-
-        // TODO confirm an order by email
-
-        log.info("Got order {}", order)
-        val calendarPath = retry(3) { consulateHttpClient.startCheckingAndOrder(website.baseUrl, order) }
-        log.info("Got calendar path {}", order)
-        val hasWindows = consulateHttpClient.checkAvailableSlots(sessionInfo, calendarPath)
-        log.info("Has windows {}", hasWindows)
-        return hasWindows
     }
 
     private suspend fun <T> retry(maxAttempts: Int, function: suspend () -> T): T {
