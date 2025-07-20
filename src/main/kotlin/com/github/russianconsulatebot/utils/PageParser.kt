@@ -78,12 +78,12 @@ object PageParser {
             .map { element ->
                 val text = element.text()
 
-                val regex = Regex("([\\d\\.]{10}) ([\\d\\:]{5}) \\((.*)\\)")
+                val regex = Regex("([\\d.]{10}) ([\\d:]{4,5}) \\((.*)\\)")
                 val matchResult = regex.find(text)
                     ?: throw PageParseSessionException("Failed to parse '$text' by regex $regex")
 
                 val date = LocalDate.parse(matchResult.groupValues[1], DateTimeFormatter.ofPattern("dd.MM.yyyy"))
-                val time = LocalTime.parse(matchResult.groupValues[2])
+                val time = LocalTime.parse(matchResult.groupValues[2], DateTimeFormatter.ofPattern("H:mm"))
                 val description = matchResult.groupValues[3]
 
                 val dateTime = LocalDateTime.of(date, time)
