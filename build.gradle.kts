@@ -1,4 +1,5 @@
 import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+import org.springframework.boot.gradle.tasks.bundling.BootBuildImage
 
 plugins {
 	id("org.springframework.boot") version "3.2.3"
@@ -50,4 +51,13 @@ tasks.withType<KotlinCompile> {
 
 tasks.withType<Test> {
 	useJUnitPlatform()
+}
+
+tasks.named<BootBuildImage>("bootBuildImage") {
+	environment.set(mapOf(
+		// To print UTF-8 logs to the docker logs
+		// BPE_APPEND_* will append to the existing env property
+		// https://paketo.io/docs/howto/configuration/
+		"BPE_APPEND_JAVA_TOOL_OPTIONS" to " -Dfile.encoding=UTF8"
+	))
 }
