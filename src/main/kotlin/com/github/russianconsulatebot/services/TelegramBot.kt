@@ -48,14 +48,28 @@ class TelegramBot(
                 }
 
                 text("log") {
-                    bot.sendMessage(
+                    val result = bot.sendMessage(
                         chatId = ChatId.fromId(message.chat.id),
                         text = "Last checks:\n${lastChecks.get().joinToString("\n") { "* $it" }}"
+                    )
+                    result.fold(
+                        {
+                            // do something here with the response
+                        },
+                        {
+                            // do something with the error
+                            bot.sendMessage(
+                                chatId = ChatId.fromId(message.chat.id),
+                                text = "Error: $it"
+                            )
+                        },
                     )
                 }
 
                 text("ping") {
-                    bot.sendMessage(chatId = ChatId.fromId(message.chat.id), text = "Pong")
+                    bot.sendMessage(
+                        chatId = ChatId.fromId(message.chat.id),
+                        text = "Pong. Your char_id is ${update.message!!.chat.id}")
                 }
 
                 telegramError {
