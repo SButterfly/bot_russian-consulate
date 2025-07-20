@@ -68,9 +68,11 @@ class ScheduledCheckerService(
             }
 
             lastChecks.push("Found slot: $availableSlots")
+            lastChecks.incSuccess()
         } catch (e: Exception) {
             log.error("Got an error", e)
             lastChecks.push(e.toString())
+            lastChecks.incFailure()
             throw e
         }
     }
