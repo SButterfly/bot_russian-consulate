@@ -1,6 +1,8 @@
 package com.github.russianconsulatebot.services
 
 import com.github.russianconsulatebot.services.dto.Website
+import kotlinx.coroutines.ExecutorCoroutineDispatcher
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.scheduling.annotation.Scheduled
@@ -12,34 +14,41 @@ import java.time.Instant
  */
 @Service
 class ScheduledCheckerService(
+    private val checkSlotsDispatcher: ExecutorCoroutineDispatcher,
     private val passport10Service: Passport10Service,
     private val telegramBot: TelegramBot,
-    @Value("\${scheduler.charIds:}")
-    private val chatIds: List<Long>,
+    @Value("\${scheduler.charIds:}") private val chatIds: List<Long>,
     private val lastChecks: LastChecks,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
-    @Scheduled(cron = "\${scheduler.day_cron}")
+    @Scheduled(cron = "\${scheduler.day_cron}", scheduler = "checkSlotsExecutor")
     suspend fun dayScheduler() {
-        log.debug("Started day check")
-        val website = Website.HAGUE
-        if (isNightTime(website)) {
-            log.debug("Stopped day check, because it's a night at {}", website)
-            return
+        // By default, Scheduler is starting a new suspend function in Unconfined dispatcher (https://t.ly/udrQi)
+        // which resulted that business code was running in reactor thread (reactor-http-nio-*)
+        // To solve it, we explicitly set dispatcher, that is made from scheduler dispatcher
+        withContext(checkSlotsDispatcher) {
+            log.debug("Started day check")
+            val website = Website.HAGUE
+            if (isNightTime(website)) {
+                log.debug("Stopped day check, because it's a night at {}", website)
+                return@withContext
+            }
+            doCheck(website)
         }
-        doCheck(website)
     }
 
-    @Scheduled(cron = "\${scheduler.night_cron}")
+    @Scheduled(cron = "\${scheduler.night_cron}", scheduler = "checkSlotsExecutor")
     suspend fun nightScheduler() {
-        log.debug("Started night check")
-        val website = Website.HAGUE
-        if (!isNightTime(website)) {
-            log.debug("Stopped night check, because it's a day at {}", website)
-            return
+        withContext(checkSlotsDispatcher) {
+            log.debug("Started night check")
+            val website = Website.HAGUE
+            if (!isNightTime(website)) {
+                log.debug("Stopped night check, because it's a day at {}", website)
+                return@withContext
+            }
+            doCheck(website)
         }
-        doCheck(website)
     }
 
     private suspend fun doCheck(website: Website) {
@@ -66,7 +75,7 @@ class ScheduledCheckerService(
         }
     }
 
-    private fun isNightTime(website: Website) : Boolean {
+    private fun isNightTime(website: Website): Boolean {
         val zonedDateTime = Instant.now().atZone(website.timezone)
         return zonedDateTime.hour >= 23 || zonedDateTime.hour <= 7
     }
