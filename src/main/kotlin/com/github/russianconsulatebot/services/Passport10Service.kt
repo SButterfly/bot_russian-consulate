@@ -30,7 +30,7 @@ class Passport10Service(
     suspend fun containsAvailableSlots(website: Website): Boolean {
         val userInfo = UserInfo.generateDummyUserInfo()
         log.info("Starting a new session")
-        val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
+        val sessionInfo = retry(5) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
         log.info("Got session: {}", sessionInfo)
 
         val calendarPath = consulateHttpClient.passToOrderPage(sessionInfo, BIOPASSPORT)
