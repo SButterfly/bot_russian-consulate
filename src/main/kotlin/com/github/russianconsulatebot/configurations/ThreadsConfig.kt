@@ -7,7 +7,6 @@ import org.springframework.context.annotation.Configuration
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledExecutorService
-import java.util.concurrent.atomic.AtomicInteger
 
 @Configuration
 class ThreadsConfig {
@@ -17,8 +16,11 @@ class ThreadsConfig {
      */
     @Bean
     fun okHttpClientExecutorService(): ExecutorService {
-        val number = AtomicInteger()
-        return Executors.newCachedThreadPool { r -> Thread(r, "ok-http-dispatcher-" + number.getAndIncrement())}
+        // Experiment: Use virtual threads for ok-http-dispatcher
+        val threadFactory = Thread.ofVirtual()
+            .name("ok-http-dispatcher-", 0)
+            .factory()
+        return Executors.newCachedThreadPool(threadFactory)
     }
 
     /**
@@ -27,7 +29,10 @@ class ThreadsConfig {
     @Bean
     fun businessLogicExecutor(): ScheduledExecutorService {
         // Experiment: Use one thread for all business process to use full power of COROUTINES !!!
-        return Executors.newSingleThreadScheduledExecutor { r -> Thread(r, "business-logic-thread")}
+        val threadFactory = Thread.ofPlatform()
+            .name("business-logic-thread-", 0)
+            .factory()
+        return Executors.newSingleThreadScheduledExecutor(threadFactory)
     }
 
     @Bean
