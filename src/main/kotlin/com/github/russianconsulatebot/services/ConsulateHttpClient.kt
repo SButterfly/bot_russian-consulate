@@ -3,10 +3,12 @@ package com.github.russianconsulatebot.services
 import com.github.russianconsulatebot.exceptions.CaptureSessionException
 import com.github.russianconsulatebot.exceptions.DataErrorSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
+import com.github.russianconsulatebot.exceptions.TooManyQuestionsSessionException
 import com.github.russianconsulatebot.services.dto.Order
 import com.github.russianconsulatebot.services.dto.PageState
 import com.github.russianconsulatebot.services.dto.SessionInfo
 import com.github.russianconsulatebot.services.dto.UserInfo
+import com.github.russianconsulatebot.utils.awaitBodyEntity
 import kotlinx.coroutines.reactive.awaitSingle
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.Element
@@ -18,6 +20,7 @@ import org.springframework.stereotype.Service
 import org.springframework.util.LinkedMultiValueMap
 import org.springframework.web.reactive.function.BodyInserters
 import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.awaitBodilessEntity
 import org.springframework.web.reactive.function.client.awaitBody
 
 const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
@@ -130,11 +133,15 @@ class ConsulateHttpClient(
                     }
             ))
             .retrieve()
-            .toBodilessEntity()
-            .awaitSingle()
+            .awaitBodyEntity<Document>()
 
         // It should redirect to the page with Confirmation
-        require(submitResponse.statusCode == HttpStatus.FOUND)
+        if (submitResponse.statusCode != HttpStatus.FOUND) {
+            if (submitResponse.body!!
+                    .selectFirst(":containsOwn(Превышено ограничение на количество вопросов)") != null) {
+                throw TooManyQuestionsSessionException("To many questions")
+            }
+        }
 
         val secondConfirmPage = webClient.get()
             .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx")
@@ -161,8 +168,8 @@ class ConsulateHttpClient(
                     }
             ))
             .retrieve()
-            .toBodilessEntity()
-            .awaitSingle()
+            .awaitBodilessEntity()
+
         require(submitResponse2.statusCode == HttpStatus.FOUND)
 
         val calendarPath = submitResponse2.headers[HttpHeaders.LOCATION]?.first()
@@ -208,8 +215,7 @@ class ConsulateHttpClient(
                     }
             ))
             .retrieve()
-            .toEntity(Document::class.java)
-            .awaitSingle()
+            .awaitBodyEntity<Document>()
 
         require(confirmationPageResponse.statusCode == HttpStatus.OK)
 
