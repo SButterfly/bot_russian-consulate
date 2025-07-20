@@ -3,26 +3,21 @@ package com.github.russianconsulatebot.services
 import com.github.russianconsulatebot.exceptions.DataErrorSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
 import com.github.russianconsulatebot.exceptions.WrongCaptureSessionException
-import io.ktor.client.HttpClient
-import io.ktor.client.call.body
-import io.ktor.client.request.forms.submitForm
-import io.ktor.client.request.get
-import io.ktor.client.request.header
-import io.ktor.client.request.prepareGet
-import io.ktor.client.statement.bodyAsText
-import io.ktor.http.HttpHeaders
-import io.ktor.http.HttpStatusCode
-import io.ktor.http.contentLength
-import io.ktor.http.parameters
-import io.ktor.utils.io.ByteReadChannel
-import io.ktor.utils.io.core.isEmpty
-import io.ktor.utils.io.core.readBytes
-import org.jsoup.Jsoup
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.reactive.awaitSingle
+import kotlinx.coroutines.withContext
 import org.jsoup.nodes.Document
 import org.jsoup.nodes.TextNode
 import org.slf4j.LoggerFactory
+import org.springframework.http.HttpHeaders
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
-import java.io.ByteArrayOutputStream
+import org.springframework.util.LinkedMultiValueMap
+import org.springframework.web.reactive.function.BodyInserters
+import org.springframework.web.reactive.function.client.WebClient
+import org.springframework.web.reactive.function.client.awaitBody
+import java.nio.file.Files
+import kotlin.io.path.writeBytes
 
 private const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
 
@@ -31,7 +26,8 @@ private const val SESSION_ID_COOKIE = "ASP.NET_SessionId"
  */
 @Service
 class ConsulateHttpClient(
-    private val httpClient: HttpClient,
+    private val webClient: WebClient,
+//    private val httpClient: HttpClient,
     private val antiCaptureService: AntiCaptureService,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
@@ -44,57 +40,60 @@ class ConsulateHttpClient(
         log.info("Starting new session...")
 
         // Get initial page with captcha
-        val httpResponse = httpClient.get("$baseUrl/queue/visitor.aspx")
-        val bodyAsText = httpResponse.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", httpResponse.status.value, bodyAsText)
+        val document = webClient.get()
+            .uri("$baseUrl/queue/visitor.aspx")
+            .retrieve()
+            .awaitBody<Document>()
 
         // Parse the page
-        val document = Jsoup.parse(bodyAsText)
         val pageState = parsePageState(document)
-        val (sessionId, captchaCode, _) = parseSessionIdAndCaptureCode(baseUrl, document)
+        val (sessionId, captchaCode, imageBytes) = parseSessionIdAndCaptureCode(baseUrl, document)
 
         // Submit form
         log.info("Submitting form with userInfo=$userInfo, captureCode=$captchaCode, and sessionId=$sessionId")
-        val submitResponse = httpClient.submitForm(
-            url = "$baseUrl/queue/visitor.aspx",
-            formParameters = parameters {
-                append("__EVENTTARGET", "")
-                append("__EVENTARGUMENT", "")
-                append("__VIEWSTATE", pageState.viewState)
-                append("__EVENTVALIDATION", pageState.eventValidation)
-                append("ctl00\$MainContent\$txtFam", userInfo.firstName)
-                append("ctl00\$MainContent\$txtIm", userInfo.secondName)
-                append("ctl00\$MainContent\$txtOt", userInfo.patronymic ?: "")
-                append("ctl00\$MainContent\$txtTel", userInfo.phoneNumber)
-                append("ctl00\$MainContent\$txtEmail", userInfo.email)
-                append("ctl00\$MainContent\$DDL_Day", userInfo.dateOfBirthStr)
-                append("ctl00\$MainContent\$DDL_Month", userInfo.monthOfBirthStr)
-                append("ctl00\$MainContent\$TextBox_Year", userInfo.yearOfBirthStr)
-                append("ctl00\$MainContent\$DDL_Mr", userInfo.title.name)
-                append("ctl00\$MainContent\$txtCode", captchaCode)
-                append("ctl00\$MainContent\$ButtonA", "Далее")
-            },
-            block = {
-                header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=$sessionId")
-            }
-        )
+        val menuPage = webClient.post()
+            .uri("$baseUrl/queue/visitor.aspx")
+            .cookie(SESSION_ID_COOKIE, sessionId)
+            .body(BodyInserters.fromFormData(
+                LinkedMultiValueMap<String, String>()
+                    .apply {
+                        add("__EVENTTARGET", "")
+                        add("__EVENTARGUMENT", "")
+                        add("__VIEWSTATE", pageState.viewState)
+                        add("__EVENTVALIDATION", pageState.eventValidation)
+                        add("ctl00\$MainContent\$txtFam", userInfo.firstName)
+                        add("ctl00\$MainContent\$txtIm", userInfo.secondName)
+                        add("ctl00\$MainContent\$txtOt", userInfo.patronymic ?: "")
+                        add("ctl00\$MainContent\$txtTel", userInfo.phoneNumber)
+                        add("ctl00\$MainContent\$txtEmail", userInfo.email)
+                        add("ctl00\$MainContent\$DDL_Day", userInfo.dateOfBirthStr)
+                        add("ctl00\$MainContent\$DDL_Month", userInfo.monthOfBirthStr)
+                        add("ctl00\$MainContent\$TextBox_Year", userInfo.yearOfBirthStr)
+                        add("ctl00\$MainContent\$DDL_Mr", userInfo.title.name)
+                        add("ctl00\$MainContent\$txtCode", captchaCode)
+                        add("ctl00\$MainContent\$ButtonA", "Далее")
+                    }
+            ))
+            .retrieve()
+            .awaitBody<Document>()
 
         // Parse menu page
-        val menuPageStr = submitResponse.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", submitResponse.status.value, menuPageStr)
-
-        val menuPage = Jsoup.parse(menuPageStr)
         val errorText = parseErrorText(menuPage)
 
         if (errorText != null) {
             if (errorText.contains("Символы с картинки введены не правильно")) {
-                throw WrongCaptureSessionException("Capture '$captchaCode' was wrong")
+                val file = withContext(Dispatchers.IO) {
+                    Files.createTempFile("capture", ".jpeg")
+                        .apply { writeBytes(imageBytes) }
+                }
+
+                throw WrongCaptureSessionException("Capture '$captchaCode' was wrong $file")
             }
             throw DataErrorSessionException("Data error: $errorText")
         }
 
         // We are on menu page
-        if (!menuPageStr.contains("ПЕРЕЧЕНЬ КОНСУЛЬСКИХ ДЕЙСТВИЙ")) {
+        if (menuPage.selectFirst(":containsOwn(ПЕРЕЧЕНЬ КОНСУЛЬСКИХ ДЕЙСТВИЙ)") == null) {
             throw SessionException("Failed to find menu on the page")
         }
 
@@ -109,76 +108,67 @@ class ConsulateHttpClient(
         log.info("Start passing forms for $consulateType and sessionInfo $sessionInfo")
 
         // Get the first page with option, which passport type we should choose
-        val orderPageResponse = httpClient.get(
-            urlString = "${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType",
-            block = {
-                header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
-            }
-        )
-        val orderPageStr = orderPageResponse.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", orderPageResponse.status.value, orderPageStr)
+        val orderPage = webClient.get()
+            .uri("${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .retrieve()
+            .awaitBody<Document>()
 
-        val orderPage = Jsoup.parse(orderPageStr)
         val orderPageState = parsePageState(orderPage)
 
         // Submit with adult params
-        val submitResponse = httpClient.submitForm(
-            url = "${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType",
-            formParameters = parameters {
-                append("__EVENTTARGET", "")
-                append("__EVENTARGUMENT", "")
-                append("__VIEWSTATE", orderPageState.viewState)
-                append("__EVENTVALIDATION", orderPageState.eventValidation)
-                append("ctl00\$MainContent\$RList", "$consulateType;PSSP")
-                append("ctl00\$MainContent\$CheckBoxID", "on")
-                append("ctl00\$MainContent\$ButtonA", "Далее")
-            },
-            block = {
-                header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
-            }
-        )
+        val submitResponse = webClient.post()
+            .uri("${sessionInfo.baseUrl}/queue/bpssp.aspx?nm=$consulateType")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .body(BodyInserters.fromFormData(
+                LinkedMultiValueMap<String, String>()
+                    .apply {
+                        add("__EVENTTARGET", "")
+                        add("__EVENTARGUMENT", "")
+                        add("__VIEWSTATE", orderPageState.viewState)
+                        add("__EVENTVALIDATION", orderPageState.eventValidation)
+                        add("ctl00\$MainContent\$RList", "$consulateType;PSSP")
+                        add("ctl00\$MainContent\$CheckBoxID", "on")
+                        add("ctl00\$MainContent\$ButtonA", "Далее")
+                    }
+            ))
+            .retrieve()
+            .toBodilessEntity()
+            .awaitSingle()
 
         // It should redirect to the page with Confirmation
-        val confirmationPageStr = submitResponse.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", submitResponse.status.value, confirmationPageStr)
-        require(submitResponse.status == HttpStatusCode.Found)
+        require(submitResponse.statusCode == HttpStatus.FOUND)
 
-        val secondConfirmResponse = httpClient.get(
-            urlString = "${sessionInfo.baseUrl}/queue/Rlist.aspx",
-            block = {
-                header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
-            }
-        )
+        val secondConfirmPage = webClient.get()
+            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .retrieve()
+            .awaitBody<Document>()
 
-        val secondConfirmPageStr = secondConfirmResponse.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", secondConfirmResponse.status.value, secondConfirmPageStr)
-
-        val confirmationPage = Jsoup.parse(secondConfirmPageStr)
-        val confirmationState = parsePageState(confirmationPage)
+        val confirmationState = parsePageState(secondConfirmPage)
 
         // TODO Add check, that such order already exists in the system
 
         log.info("Sending second confirmation")
-        val submitResponse2 = httpClient.submitForm(
-            url = "${sessionInfo.baseUrl}/queue/Rlist.aspx",
-            formParameters = parameters {
-                append("__EVENTTARGET", "")
-                append("__EVENTARGUMENT", "")
-                append("__VIEWSTATE", confirmationState.viewState)
-                append("__EVENTVALIDATION", confirmationState.eventValidation)
-                // __PREVIOUSPAGE
-                append("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
-            },
-            block = {
-                header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
-            }
-        )
+        val submitResponse2 = webClient.post()
+            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .body(BodyInserters.fromFormData(
+                LinkedMultiValueMap<String, String>()
+                    .apply {
+                        add("__EVENTTARGET", "")
+                        add("__EVENTARGUMENT", "")
+                        add("__VIEWSTATE", confirmationState.viewState)
+                        add("__EVENTVALIDATION", confirmationState.eventValidation)
+                        add("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
+                    }
+            ))
+            .retrieve()
+            .toBodilessEntity()
+            .awaitSingle()
+        require(submitResponse2.statusCode == HttpStatus.FOUND)
 
-        val redirectPage = submitResponse2.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", submitResponse2.status.value, redirectPage)
-        require(submitResponse2.status == HttpStatusCode.Found)
-
-        val calendarPath = submitResponse2.headers[HttpHeaders.Location]
+        val calendarPath = submitResponse2.headers[HttpHeaders.LOCATION]?.first()
         log.info("Calendar path: $calendarPath")
 
         return calendarPath!!
@@ -191,63 +181,66 @@ class ConsulateHttpClient(
         log.info("Starting a new session...")
         
         // Get page to check status of order
-        val orderPageResponse = httpClient.get("$baseUrl/queue/orderinfo.aspx")
-        val orderPage = Jsoup.parse(orderPageResponse.bodyAsText())
-        log.debug("STATUS: {}, BODY {}", orderPageResponse.status.value, orderPage)
+        val orderPage = webClient.get()
+            .uri("$baseUrl/queue/orderinfo.aspx")
+            .retrieve()
+            .awaitBody<Document>()
 
         val (eventValidation, viewState) = parsePageState(orderPage)
         val (sessionId, captchaCode) = parseSessionIdAndCaptureCode(baseUrl, orderPage)
 
         // Submit form
-        log.debug("Submitting form...")
-        val confirmationPageResponse = httpClient.submitForm(
-            url = "$baseUrl/queue/orderinfo.aspx",
-            formParameters = parameters {
-                append("__EVENTTARGET", "")
-                append("__EVENTARGUMENT", "")
-                append("__VIEWSTATE", viewState)
-                append("__EVENTVALIDATION", eventValidation)
-                append("ctl00\$MainContent\$txtID", order.orderNumber)
-                append("ctl00\$MainContent\$txtUniqueID", order.code)
-                append("ctl00\$MainContent\$txtCode", captchaCode)
-                append("ctl00\$MainContent\$ButtonA", "Далее")
-                append("ctl00\$MainContent\$FeedbackClientID", "0")
-                append("ctl00\$MainContent\$FeedbackOrderID", "0")
-            },
-            block = {
-                header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=$sessionId")
-            }
-        )
+        log.info("Submitting form...")
+        val confirmationPageResponse = webClient.post()
+            .uri("$baseUrl/queue/orderinfo.aspx")
+            .cookie(SESSION_ID_COOKIE, sessionId)
+            .body(BodyInserters.fromFormData(
+                LinkedMultiValueMap<String, String>()
+                    .apply {
+                        add("__EVENTTARGET", "")
+                        add("__EVENTARGUMENT", "")
+                        add("__VIEWSTATE", viewState)
+                        add("__EVENTVALIDATION", eventValidation)
+                        add("ctl00\$MainContent\$txtID", order.orderNumber)
+                        add("ctl00\$MainContent\$txtUniqueID", order.code)
+                        add("ctl00\$MainContent\$txtCode", captchaCode)
+                        add("ctl00\$MainContent\$ButtonA", "Далее")
+                        add("ctl00\$MainContent\$FeedbackClientID", "0")
+                        add("ctl00\$MainContent\$FeedbackOrderID", "0")
+                    }
+            ))
+            .retrieve()
+            .toEntity(Document::class.java)
+            .awaitSingle()
 
-        val confirmationPage = Jsoup.parse(confirmationPageResponse.bodyAsText())
-        log.debug("STATUS: {}, BODY {}", confirmationPageResponse.status.value, confirmationPage)
-        require(confirmationPageResponse.status == HttpStatusCode.OK)
+        require(confirmationPageResponse.statusCode == HttpStatus.OK)
 
         // Reparse some params
-        val (eventValidation2, viewState2) = parsePageState(confirmationPage)
+        val (eventValidation2, viewState2) = parsePageState(confirmationPageResponse.body!!)
 
         // Submit again:
         log.debug("Submitting form again...")
-        val confirmationPageResponse2 = httpClient.submitForm(
-            url = "$baseUrl/queue/orderinfo.aspx",
-            formParameters = parameters {
-                append("__EVENTTARGET", "")
-                append("__EVENTARGUMENT", "")
-                append("__VIEWSTATE", viewState2)
-                append("__EVENTVALIDATION", eventValidation2)
-                append("ctl00\$MainContent\$ButtonB.x", "133")
-                append("ctl00\$MainContent\$ButtonB.y", "30")
-            },
-            block = {
-                header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=$sessionId")
-            }
-        )
-        val confirmationPage2 = Jsoup.parse(confirmationPageResponse2.bodyAsText())
-        log.debug("STATUS: {}, BODY {}", confirmationPageResponse2.status.value, confirmationPage2)
-        require(confirmationPageResponse2.status == HttpStatusCode.Found)
+        val confirmationPageResponse2 = webClient.post()
+            .uri("$baseUrl/queue/orderinfo.aspx")
+            .cookie(SESSION_ID_COOKIE, sessionId)
+            .body(BodyInserters.fromFormData(
+                LinkedMultiValueMap<String, String>()
+                    .apply {
+                        add("__EVENTTARGET", "")
+                        add("__EVENTARGUMENT", "")
+                        add("__VIEWSTATE", viewState2)
+                        add("__EVENTVALIDATION", eventValidation2)
+                        add("ctl00\$MainContent\$ButtonB.x", "133")
+                        add("ctl00\$MainContent\$ButtonB.y", "30")
+                    }
+            ))
+            .retrieve()
+            .toBodilessEntity()
+            .awaitSingle()
+        require(confirmationPageResponse2.statusCode == HttpStatus.FOUND)
 
         // Get redirect page
-        val redirectPath = confirmationPageResponse2.headers[HttpHeaders.Location]
+        val redirectPath = confirmationPageResponse2.headers[HttpHeaders.LOCATION]?.first()
         log.info("Check URL: $redirectPath")
 
         return OrderInfo(baseUrl, redirectPath!!, sessionId, order)
@@ -259,29 +252,28 @@ class ConsulateHttpClient(
     suspend fun checkAvailableSlots(sessionInfo: SessionInfo, calendarPage: String) : Boolean {
         log.info("Checking an order at {}", sessionInfo)
 
-        val httpResponse = httpClient.get("${sessionInfo.baseUrl}${calendarPage}") {
-            header(HttpHeaders.Cookie, "$SESSION_ID_COOKIE=${sessionInfo.sessionId}")
-        }
+        val orderPage = webClient.get()
+            .uri("${sessionInfo.baseUrl}${calendarPage}")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .retrieve()
+            .awaitBody<Document>()
 
-        val orderPageStr = httpResponse.bodyAsText()
-        log.debug("STATUS: {}, BODY {}", httpResponse.status.value, orderPageStr)
+        // TODO If session was broken than it will redirect to the login page
+//        if (orderPage.selectFirst("input#ctl00\$MainContent\$txtEmail") != null) {
+//            throw SessionException("Redirected to the start page")
+//        }
 
-        // TODO This is an email field from first page. If session was broken than it will redirect to that page
-        if (orderPageStr.contains("<input name=\"ctl00\$MainContent\$txtEmail\" type=\"text\"")) {
-            throw SessionException("Redirected to the start page")
-        }
-
-        if (orderPageStr.contains("Ваша заявка заблокирована")) {
+        if (orderPage.selectFirst(":containsOwn(Ваша заявка заблокирована)") != null) {
             throw SessionException("Your order is blocked")
         }
 
         // Calendar widget should be on our target page
-        if (!orderPageStr.contains("id=\"ctl00_MainContent_Calendar\"")) {
+        if (orderPage.selectFirst("#ctl00_MainContent_Calendar") == null) {
             throw SessionException("Calendar widget is not on the page")
         }
 
         // Ok, seems like we're there.
-        if (orderPageStr.contains("<p>Извините, но в настоящий момент на интересующее Вас консульское действие в системе предварительной записи нет свободного времени.</p>")) {
+        if (orderPage.selectFirst(":containsOwn(нет свободного времени)") != null) {
             return false
         } else {
             return true
@@ -291,7 +283,7 @@ class ConsulateHttpClient(
     private suspend fun parseSessionIdAndCaptureCode(baseUrl: String, document: Document) : Triple<String, String, ByteArray> {
         // Parse captcha image src
         log.info("Parsing captcha image src...")
-        val imageElement = document.select("div.inp img").first()
+        val imageElement = document.selectFirst("div.inp img")
         val captchaSrc = imageElement?.attr("src") ?: throw RuntimeException("Captcha image not found")
 
         val captchaUrl = "$baseUrl/queue/$captchaSrc"
@@ -307,10 +299,10 @@ class ConsulateHttpClient(
 
     private fun parsePageState(document: Document) : PageState {
         log.info("Parsing state...")
-        val eventValidationElement = document.select("input#__EVENTVALIDATION").first()
+        val eventValidationElement = document.selectFirst("input#__EVENTVALIDATION")
         val eventValidationField = eventValidationElement?.attr("value") ?: ""
 
-        val viewStateElement = document.select("input#__VIEWSTATE").first()
+        val viewStateElement = document.selectFirst("input#__VIEWSTATE")
         val viewStateField = viewStateElement?.attr("value") ?: ""
 
         log.info("EventValidation code: {}", eventValidationField)
@@ -320,35 +312,27 @@ class ConsulateHttpClient(
     }
 
     private suspend fun fetchImageAndSessionId(captchaUrl: String): Pair<ByteArray, String> {
-        return httpClient.prepareGet(captchaUrl).execute { response ->
-            val setCookie = response.headers[HttpHeaders.SetCookie]
-            log.info("Received image with ${response.contentLength()} content length and Set-Cookie ${setCookie}")
+        val response = webClient.get()
+            .uri(captchaUrl)
+            .retrieve()
+            .toEntity(ByteArray::class.java)
+            .awaitSingle()
 
-            val sessionId = setCookie
-                ?.split(";")
-                ?.find { it.startsWith(SESSION_ID_COOKIE) }
-                ?.split("=")
-                ?.get(1)
-                ?: throw RuntimeException("ASP.NET_SessionId header not found in cookies: $setCookie")
+        val setCookieHeader = response.headers[HttpHeaders.SET_COOKIE]?.first()
+        val sessionId = setCookieHeader
+            ?.split(";")
+            ?.find { it.startsWith(SESSION_ID_COOKIE) }
+            ?.split("=")
+            ?.get(1)
+            ?: throw RuntimeException("ASP.NET_SessionId header not found in cookies: $setCookieHeader")
 
-            val outputStream = ByteArrayOutputStream()
-            val channel: ByteReadChannel = response.body()
-            while (!channel.isClosedForRead) {
-                val packet = channel.readRemaining(DEFAULT_BUFFER_SIZE.toLong())
-                while (!packet.isEmpty) {
-                    val bytes = packet.readBytes()
-                    outputStream.write(bytes)
-                }
-            }
-            return@execute Pair(outputStream.toByteArray(), sessionId)
-        }
+        return Pair(response.body!!, sessionId)
     }
 
     private fun parseErrorText(document: Document): String? {
-        val errorBlock = document.select("#ctl00_MainContent_lblCodeErr").first() ?: return null
+        val errorBlock = document.selectFirst("#ctl00_MainContent_lblCodeErr") ?: return null
 
-        // the first element of erorr block is <font>, skip it
-        val children = errorBlock.children().first()!!.childNodes()
+        val children = errorBlock.childNodes()
         val stringBuilder = StringBuilder()
         for (child in children) {
             if (child is TextNode) {
