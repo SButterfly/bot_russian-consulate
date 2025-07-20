@@ -26,7 +26,6 @@ class HttpClientConfiguration {
                     HttpHeaders.ACCEPT,
                     "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7"
                 )
-                it.set(HttpHeaders.ACCEPT_ENCODING, "gzip, deflate, br")
                 it.set(HttpHeaders.ACCEPT_LANGUAGE, "ru,ru-RU;q=0.9,en-US;q=0.8,en;q=0.7,zh;q=0.6")
                 it.set(HttpHeaders.CACHE_CONTROL, "max-age=0")
                 it.set(HttpHeaders.CONNECTION, "keep-alive")

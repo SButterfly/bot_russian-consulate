@@ -1,7 +1,6 @@
 package com.github.russianconsulatebot.services
 
 import com.github.russianconsulatebot.exceptions.WrongCaptureSessionException
-import com.github.russianconsulatebot.services.dto.Order
 import com.github.russianconsulatebot.services.dto.UserInfo
 import com.github.russianconsulatebot.services.dto.Website
 import org.slf4j.LoggerFactory
@@ -17,17 +16,35 @@ class Passport10Service(
     private val log = LoggerFactory.getLogger(Passport10Service::class.java)
 
     suspend fun containsAvailableSlots(website: Website): Boolean {
-        // TODO remove hardcoded values
-        val order = Order("104497", "8F71F287")
-
         val userInfo = UserInfo.generateDummyUserInfo()
 
-        val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
-        log.info("Got session: {}", sessionInfo)
-        val orderPath = consulateHttpClient.passToCalendarPage(sessionInfo, "BIOPASSPORT")
-        log.info("Got order path: {}", orderPath)
-        val hasWindows = consulateHttpClient.checkAvailableSlots(sessionInfo, orderPath)
-        return hasWindows
+        when (website) {
+            Website.HAGUE -> {
+                val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
+                log.info("Got session: {}", sessionInfo)
+                val calendarPath = consulateHttpClient.passToOrderPage(sessionInfo, "BIOPASSPORT")
+                log.info("Got order path: {}", calendarPath)
+                val hasWindows = consulateHttpClient.checkAvailableSlots(sessionInfo, calendarPath)
+                log.info("Has windows {}", hasWindows)
+                return hasWindows
+            }
+            Website.BELGUM -> {
+                val sessionInfo = retry(3) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
+                log.info("Got session: {}", sessionInfo)
+                val orderPath = consulateHttpClient.passToOrderPage(sessionInfo, "BIOPASSPORT")
+                log.info("Got order path: {}", orderPath)
+                val order = consulateHttpClient.parseOrder(sessionInfo, orderPath)
+
+                // TODO confirm an order by email
+
+                log.info("Got order {}", order)
+                val calendarPath = retry(3) { consulateHttpClient.startCheckingAndOrder(website.baseUrl, order) }
+                log.info("Got calendar path {}", order)
+                val hasWindows = consulateHttpClient.checkAvailableSlots(sessionInfo, calendarPath)
+                log.info("Has windows {}", hasWindows)
+                return hasWindows
+            }
+        }
     }
 
     private suspend fun <T> retry(maxAttempts: Int, function: suspend () -> T): T {
