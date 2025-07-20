@@ -1,14 +1,16 @@
 package com.github.russianconsulatebot.services
 
 import com.fasterxml.jackson.databind.JsonNode
+import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.node.ArrayNode
 import com.github.russianconsulatebot.exceptions.CaptureSessionException
+import com.github.russianconsulatebot.utils.executeAsync
+import okhttp3.MediaType.Companion.toMediaType
+import okhttp3.OkHttpClient
+import okhttp3.Request
+import okhttp3.RequestBody.Companion.toRequestBody
 import org.slf4j.LoggerFactory
-import org.springframework.http.MediaType
 import org.springframework.stereotype.Service
-import org.springframework.web.reactive.function.BodyInserters
-import org.springframework.web.reactive.function.client.WebClient
-import org.springframework.web.reactive.function.client.awaitBody
 import java.awt.image.BufferedImage
 import java.io.ByteArrayOutputStream
 import javax.imageio.ImageIO
@@ -23,7 +25,8 @@ import kotlin.io.encoding.ExperimentalEncodingApi
  */
 @Service
 class AntiCaptureService(
-    val webClient: WebClient,
+    val okHttpClient: OkHttpClient,
+    val objectMapper: ObjectMapper,
 ) {
     private val log = LoggerFactory.getLogger(this::class.java)
 
@@ -40,15 +43,19 @@ class AntiCaptureService(
                 -H 'Content-Type: application/json' \
                 -d "{\"data\": [\"data:image/jpeg;base64,$(base64 -i myFile.jpeg)\",[\"en\"]]}"
         */
+        val request = Request.Builder()
+            .url("https://tomofi-easyocr.hf.space/api/predict/")
+            .post(
+                "{\"data\":[\"data:$mimeType;base64,$base64\",[\"en\"]]}"
+                    .toRequestBody(contentType = "application/json".toMediaType())
+            )
+            .addHeader("Content-Type", "application/json")
+            .build()
 
-        val response = webClient.post()
-            .uri("https://tomofi-easyocr.hf.space/api/predict/")
-            .contentType(MediaType.APPLICATION_JSON)
-            .body(BodyInserters.fromValue("{\"data\":[\"data:$mimeType;base64,$base64\",[\"en\"]]}"))
-            .retrieve()
-            .awaitBody<JsonNode>()
+        val response = okHttpClient.newCall(request).executeAsync()
+        val jsonNode = objectMapper.readTree(response.body!!.byteStream())
 
-        val code = parseResponse(response, image)
+        val code = parseResponse(jsonNode, image)
         log.info("Code was post processed. Code: {}", code)
         return code
     }

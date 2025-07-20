@@ -25,7 +25,7 @@ repositories {
 dependencies {
 	// Spring
 	implementation("org.springframework.boot:spring-boot-starter")
-	implementation("org.springframework.boot:spring-boot-starter-webflux")
+	implementation("org.springframework.boot:spring-boot-starter-json")
 	// kotlin reflection is needed for spring to run
 	implementation("org.jetbrains.kotlin:kotlin-reflect")
 
