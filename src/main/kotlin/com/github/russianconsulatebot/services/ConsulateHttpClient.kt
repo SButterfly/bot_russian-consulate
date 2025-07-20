@@ -9,6 +9,8 @@ import com.github.russianconsulatebot.services.dto.Order
 import com.github.russianconsulatebot.services.dto.PageState
 import com.github.russianconsulatebot.services.dto.SessionInfo
 import com.github.russianconsulatebot.services.dto.UserInfo
+import com.github.russianconsulatebot.utils.PageParser
+import com.github.russianconsulatebot.utils.Slot
 import com.github.russianconsulatebot.utils.awaitBodyEntity
 import kotlinx.coroutines.reactive.awaitSingle
 import org.jsoup.nodes.Document
@@ -100,10 +102,61 @@ class ConsulateHttpClient(
     }
 
     /**
-     * Fills in any forms to get to the calendar or order page.
-     * Returns url path to the consulate action. e.g. TODO
+     * Pass to the calendar page with availabilities.
+     *
+     * @return calendar path e.g. /queue/SPCalendar.aspx
      */
     suspend fun passToOrderPage(sessionInfo: SessionInfo, consulateType: String): String {
+        log.info("Start passing forms for $consulateType and sessionInfo $sessionInfo")
+
+        // Get the first page with option, which passport type we should choose
+        val orderPage = webClient.get()
+            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx?nm=$consulateType")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .retrieve()
+            .awaitBody<Document>()
+
+        val orderPageState = parsePageState(orderPage)
+
+        // Submit the chosen option
+        val submitResponse = webClient.post()
+            .uri("${sessionInfo.baseUrl}/queue/Rlist.aspx?nm=$consulateType")
+            .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+            .body(BodyInserters.fromFormData(
+                LinkedMultiValueMap<String, String>()
+                    .apply {
+                        add("__EVENTTARGET", "")
+                        add("__EVENTARGUMENT", "")
+                        add("__VIEWSTATE", orderPageState.viewState)
+                        add("__PREVIOUSPAGE", orderPageState.previousPage)
+                        add("__EVENTVALIDATION", orderPageState.eventValidation)
+                        add("ctl00\$MainContent\$ButtonQueue", "Записаться на прием")
+                    }
+            ))
+            .retrieve()
+            .awaitBodyEntity<Document>()
+
+        // It should redirect to the page with Calendar
+        if (submitResponse.statusCode != HttpStatus.FOUND) {
+            if (submitResponse.body!!
+                    .selectFirst(":containsOwn(Превышено ограничение на количество вопросов)") != null) {
+                throw TooManyQuestionsSessionException("To many questions")
+            }
+            throw SessionException("The response should be redirected to another page")
+        }
+
+        val calendarPath = submitResponse.headers[HttpHeaders.LOCATION]?.first()
+        log.info("Calendar path: $calendarPath")
+
+        return calendarPath!!
+    }
+
+    /**
+     * A special method to pass to form for passport on 10 years.
+     *
+     * @return calendar path e.g. /queue/SPCalendar.aspx
+     */
+    suspend fun passToPassportOrderPage(sessionInfo: SessionInfo, consulateType: String): String {
         log.info("Start passing forms for $consulateType and sessionInfo $sessionInfo")
 
         // Get the first page with option, which passport type we should choose
@@ -296,7 +349,7 @@ class ConsulateHttpClient(
     /**
      * Checks available slots on the calendar page.
      */
-    suspend fun checkAvailableSlots(sessionInfo: SessionInfo, calendarPagePath: String) : Boolean {
+    suspend fun checkSlots(sessionInfo: SessionInfo, calendarPagePath: String): List<Slot> {
         log.info("Checking an order at {}", sessionInfo)
 
         val orderResponse = webClient.get()
@@ -328,10 +381,57 @@ class ConsulateHttpClient(
 
         // Ok, seems like we're there.
         if (orderPage.selectFirst(":containsOwn(нет свободного времени)") != null) {
-            return false
+            return emptyList()
         } else {
-            return true
+            log.info("Found available slots! Try to parse them")
+            val slots = parseSlots(sessionInfo, calendarPagePath, orderPage)
+            return slots
         }
+    }
+
+    private suspend fun parseSlots(sessionInfo: SessionInfo, calendarPagePath: String, calendarPage: Document): List<Slot> {
+        // try to parse a page
+        val calendarInfo = PageParser.parseCalendar(calendarPage)
+        val calendarPageState = parsePageState(calendarPage)
+        log.info("Parsed a page and got this calendar info: {}", calendarInfo)
+
+        // create result list
+        val resultSlots = mutableListOf<Slot>()
+
+        // process first day
+        val selectedDay = calendarInfo.selectedDay
+        val selectedDaySlots = PageParser.parseSlots(calendarPage)
+        resultSlots.addAll(selectedDaySlots)
+        log.debug("Found {} slots in the selected day: {}", selectedDaySlots.size, selectedDay.date)
+
+        // process other days
+        val availableDays = calendarInfo.availableDays
+        for (day in availableDays) {
+            if (day == selectedDay) {
+                continue
+            }
+
+            log.debug("Requesting slots for {} day", day.date)
+            val dayPage = webClient.post()
+                .uri("${sessionInfo.baseUrl}${calendarPagePath}")
+                .cookie(SESSION_ID_COOKIE, sessionInfo.sessionId)
+                .body(BodyInserters.fromFormData(
+                    LinkedMultiValueMap<String, String>()
+                        .apply {
+                            add("__EVENTTARGET", day.eventTarget)
+                            add("__EVENTARGUMENT", day.eventArgument)
+                            add("__VIEWSTATE", calendarPageState.viewState)
+                            add("__EVENTVALIDATION", calendarPageState.eventValidation)
+                        }
+                ))
+                .retrieve()
+                .awaitBody<Document>()
+
+            val slots = PageParser.parseSlots(dayPage)
+            resultSlots.addAll(slots)
+            log.debug("Found {} slots in the day: {}", slots.size, day.date)
+        }
+        return resultSlots
     }
 
     private fun parsePageState(document: Document) : PageState {

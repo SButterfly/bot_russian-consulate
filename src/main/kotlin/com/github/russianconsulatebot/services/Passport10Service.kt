@@ -4,6 +4,7 @@ import com.github.russianconsulatebot.exceptions.CaptureSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
 import com.github.russianconsulatebot.services.dto.UserInfo
 import com.github.russianconsulatebot.services.dto.Website
+import com.github.russianconsulatebot.utils.Slot
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
@@ -14,6 +15,7 @@ import java.nio.file.Files
 import javax.imageio.ImageIO
 
 private const val BIOPASSPORT = "BIOPASSPORT"
+private const val PASSPORT_GET = "PASSPORT_GET"
 
 private const val CALENDAR_PAGE = "/queue/SPCalendar.aspx"
 private const val WAITLIST_PAGE = "/queue/waitlist.aspx"
@@ -27,13 +29,13 @@ class Passport10Service(
 ) {
     private val log = LoggerFactory.getLogger(Passport10Service::class.java)
 
-    suspend fun containsAvailableSlots(website: Website): Boolean {
+    suspend fun containsAvailableSlots(website: Website): List<Slot> {
         val userInfo = UserInfo.generateDummyUserInfo()
         log.info("Starting a new session")
         val sessionInfo = retry(5) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
         log.info("Got session: {}", sessionInfo)
 
-        val calendarPath = consulateHttpClient.passToOrderPage(sessionInfo, BIOPASSPORT)
+        val calendarPath = consulateHttpClient.passToPassportOrderPage(sessionInfo, BIOPASSPORT)
         log.info("Got order path: {}", calendarPath)
         if (calendarPath == WAITLIST_PAGE) {
             throw IllegalStateException("Page '$calendarPath' is not supported yet")
@@ -42,9 +44,29 @@ class Passport10Service(
             throw IllegalStateException("Expected $calendarPath to be equal $CALENDAR_PAGE")
         }
 
-        val hasSlots = consulateHttpClient.checkAvailableSlots(sessionInfo, CALENDAR_PAGE)
-        log.info("Has windows: {}", hasSlots)
-        return hasSlots
+        val slots = consulateHttpClient.checkSlots(sessionInfo, CALENDAR_PAGE)
+        log.info("Found {} available slots", slots.size)
+        return slots
+    }
+
+    suspend fun containsSlotsToPickupAPassport(website: Website): List<Slot> {
+        val userInfo = UserInfo.generateDummyUserInfo()
+        log.info("Starting a new session")
+        val sessionInfo = retry(5) { consulateHttpClient.startSession(website.baseUrl, userInfo) }
+        log.info("Got session: {}", sessionInfo)
+
+        val calendarPath = consulateHttpClient.passToOrderPage(sessionInfo, PASSPORT_GET)
+        log.info("Got calendar path: {}", calendarPath)
+        if (calendarPath == WAITLIST_PAGE) {
+            throw IllegalStateException("Page '$calendarPath' is not supported yet")
+        }
+        if (calendarPath != CALENDAR_PAGE) {
+            throw IllegalStateException("Expected $calendarPath to be equal $CALENDAR_PAGE")
+        }
+
+        val slots = consulateHttpClient.checkSlots(sessionInfo, CALENDAR_PAGE)
+        log.info("Found {} available slots", slots.size)
+        return slots
     }
 
     private suspend fun <T> retry(maxAttempts: Int, function: suspend () -> T): T {
