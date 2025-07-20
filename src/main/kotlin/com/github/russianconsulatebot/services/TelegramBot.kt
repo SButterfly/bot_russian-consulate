@@ -14,6 +14,7 @@ import jakarta.annotation.PreDestroy
 import org.slf4j.LoggerFactory
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.stereotype.Service
+import kotlin.math.max
 
 @Service
 class TelegramBot(
@@ -48,9 +49,13 @@ class TelegramBot(
                 }
 
                 text("log") {
+                    val checks = lastChecks.get().joinToString("\n") { "* $it" }
+                    // No more, that 4096 symbols in total, so keep last entries
+                    val trimmedText = checks.substring(max(checks.length - 4000, 0), checks.length)
+
                     val result = bot.sendMessage(
                         chatId = ChatId.fromId(message.chat.id),
-                        text = "Last checks:\n${lastChecks.get().joinToString("\n") { "* $it" }}"
+                        text = "Last checks:\n$trimmedText"
                     )
                     result.fold(
                         {
