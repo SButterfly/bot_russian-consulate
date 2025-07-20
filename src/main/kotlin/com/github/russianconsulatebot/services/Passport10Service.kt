@@ -1,10 +1,17 @@
 package com.github.russianconsulatebot.services
 
-import com.github.russianconsulatebot.exceptions.WrongCaptureSessionException
+import com.github.russianconsulatebot.exceptions.CaptureSessionException
+import com.github.russianconsulatebot.exceptions.SessionException
 import com.github.russianconsulatebot.services.dto.UserInfo
 import com.github.russianconsulatebot.services.dto.Website
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import org.springframework.stereotype.Service
+import java.awt.image.BufferedImage
+import java.io.FileOutputStream
+import java.nio.file.Files
+import javax.imageio.ImageIO
 
 /**
  * Check availability on the passport 10.
@@ -53,11 +60,21 @@ class Passport10Service(
         do {
             try {
                 return function()
-            } catch (e: WrongCaptureSessionException) {
-                log.warn("Retrying due to an error", e)
-                lastException = e
+            } catch (e: CaptureSessionException) {
+                val tempFile = createTempPicture(e.image)
+                val mappedException = SessionException("${e.message}. Capture file $tempFile", e)
+                log.warn("Retrying due to an error", mappedException)
+                lastException = mappedException
             }
         } while (++invocationNumber < maxAttempts)
         throw lastException
+    }
+
+    private suspend fun createTempPicture(image: BufferedImage) = withContext(Dispatchers.IO) {
+        val tempFile = Files.createTempFile("capture", ".jpeg").toFile()
+        FileOutputStream(tempFile).use {
+            ImageIO.write(image, "jpeg", it)
+        }
+        tempFile
     }
 }
