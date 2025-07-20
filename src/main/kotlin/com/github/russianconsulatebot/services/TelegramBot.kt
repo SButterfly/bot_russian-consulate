@@ -57,10 +57,11 @@ class TelegramBot(
                             // do something here with the response
                         },
                         {
+                            log.error("Got an error while sending a response to telegram API: {}", it)
                             // do something with the error
                             bot.sendMessage(
                                 chatId = ChatId.fromId(message.chat.id),
-                                text = "Error: $it"
+                                text = "Error while sending a response to telegram API: $it"
                             )
                         },
                     )
