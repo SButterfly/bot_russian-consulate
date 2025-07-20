@@ -94,7 +94,7 @@ class ConsulateHttpClient(
         val errorTextElement = menuPage.selectFirst("#ctl00_MainContent_lblCodeErr")
         if (errorTextElement != null) {
             val errorText = errorTextElement.childTexts().joinToString("\n")
-            if (errorText.contains("Символы с картинки введены не правильно")) {
+            if (errorText.contains("Символы с картинки введены неправильно")) {
                 throw CaptureSessionException("Capture '$captchaCode' was wrong", image)
             }
             throw DataErrorSessionException("Data error: $errorText")
