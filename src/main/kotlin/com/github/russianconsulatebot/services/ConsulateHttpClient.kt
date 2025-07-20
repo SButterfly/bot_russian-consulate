@@ -3,6 +3,11 @@ package com.github.russianconsulatebot.services
 import com.github.russianconsulatebot.exceptions.DataErrorSessionException
 import com.github.russianconsulatebot.exceptions.SessionException
 import com.github.russianconsulatebot.exceptions.WrongCaptureSessionException
+import com.github.russianconsulatebot.services.dto.Order
+import com.github.russianconsulatebot.services.dto.OrderInfo
+import com.github.russianconsulatebot.services.dto.PageState
+import com.github.russianconsulatebot.services.dto.SessionInfo
+import com.github.russianconsulatebot.services.dto.UserInfo
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.reactive.awaitSingle
 import kotlinx.coroutines.withContext

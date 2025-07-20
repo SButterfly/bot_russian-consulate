@@ -1,4 +1,4 @@
-package com.github.russianconsulatebot.services
+package com.github.russianconsulatebot.services.dto
 
 data class Order(
     val orderNumber: String,

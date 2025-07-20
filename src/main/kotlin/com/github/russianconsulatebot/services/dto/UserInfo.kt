@@ -1,4 +1,4 @@
-package com.github.russianconsulatebot.services
+package com.github.russianconsulatebot.services.dto
 
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
@@ -33,7 +33,3 @@ data class UserInfo(
     val yearOfBirthStr= birthDate.format(DateTimeFormatter.ofPattern("yyyy"))
 }
 
-enum class Title {
-    MR,
-    MS
-}
