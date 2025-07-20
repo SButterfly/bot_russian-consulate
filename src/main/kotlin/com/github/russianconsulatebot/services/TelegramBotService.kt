@@ -1,7 +1,10 @@
 package com.github.russianconsulatebot.services
 
 import com.github.russianconsulatebot.utils.executeAsync
+import com.github.russianconsulatebot.utils.offset
+import com.github.russianconsulatebot.utils.timeout
 import com.pengrad.telegrambot.TelegramBot
+import com.pengrad.telegrambot.TelegramException
 import com.pengrad.telegrambot.model.Update
 import com.pengrad.telegrambot.request.GetUpdates
 import com.pengrad.telegrambot.request.SendMessage
@@ -31,51 +34,58 @@ class TelegramBotService(
 
     @PostConstruct
     fun start() {
+        log.info("Starting GetUpdates telegram background process")
         job?.cancel()
+
         val handler = CoroutineExceptionHandler { _, exception ->
             log.error("Caught $exception during telegram job runner", exception)
         }
         job = scope.launch(context = handler) {
             var request = GetUpdates().timeout(30) // secs
             while (true) {
-                log.debug("Started a check for {} timeout secs and {} offset",
-                    request.timeoutSeconds, request.parameters["offset"])
-
-                val response = bot.executeAsync(request)
-                log.debug("Received {}", response)
-
-                if (!response.isOk || response.updates().isNullOrEmpty()) {
-                    if (!response.isOk) {
-                        log.error(
-                            "GetUpdates failed with error_code {} {}",
-                            response.errorCode(),
-                            response.description()
-                        )
-                    }
-                    continue
+                try {
+                    val lastUpdateId = processRequest(request)
+                    request = request.offset(lastUpdateId + 1)
+                } catch (e: Exception) {
+                    log.error("Got an exception trying to process for {} timeout secs and {} offset",
+                        request.timeout, request.offset, e)
                 }
-
-                val updates = response.updates()
-                for (update: Update in updates) {
-                    try {
-                        processUpdate(update)
-                    } catch (e: Exception) {
-                        log.error("Failed to process an update: $update", e)
-                    }
-                }
-
-                val lastUpdateId = updates.last().updateId()
-                request = request.offset(lastUpdateId + 1)
 
                 yield()
             }
         }
+        log.info("Started GetUpdates telegram background process")
     }
 
     @PreDestroy
     fun stop() {
-        log.debug("Started cancellation of the coroutine job")
+        log.info("Cancelling telegram background process")
         job?.cancel()
+        log.info("Cancelled telegram background process")
+    }
+
+    private suspend fun processRequest(request: GetUpdates): Int {
+        log.debug("Started a check for {} timeout secs and {} offset",
+            request.timeout, request.offset)
+
+        val response = bot.executeAsync(request)
+
+        log.debug("Received {}", response)
+
+        if (!response.isOk) {
+            throw TelegramException("${response.errorCode()} ${response.description()}", response)
+        }
+
+        val updates = response.updates()
+        for (update: Update in updates) {
+            try {
+                processUpdate(update)
+            } catch (e: Exception) {
+                log.error("Failed to process an update: $update", e)
+            }
+        }
+
+        return updates.last().updateId()
     }
 
     private suspend fun processUpdate(update: Update) {

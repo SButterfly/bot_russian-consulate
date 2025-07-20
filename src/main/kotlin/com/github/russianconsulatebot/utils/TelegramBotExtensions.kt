@@ -3,6 +3,7 @@ package com.github.russianconsulatebot.utils
 import com.pengrad.telegrambot.Callback
 import com.pengrad.telegrambot.TelegramBot
 import com.pengrad.telegrambot.request.BaseRequest
+import com.pengrad.telegrambot.request.GetUpdates
 import com.pengrad.telegrambot.response.BaseResponse
 import kotlinx.coroutines.suspendCancellableCoroutine
 import okhttp3.OkHttpClient
@@ -32,3 +33,10 @@ suspend inline fun <T : BaseRequest<T, R>, R : BaseResponse> TelegramBot.execute
         }
     }
 }
+
+val GetUpdates.offset: Int?
+    get() = this.parameters["offset"] as Int?
+
+val GetUpdates.timeout: Int
+    get() = this.timeoutSeconds
+
